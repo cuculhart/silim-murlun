@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>Silim Murlun — spike</title>
+<style>
+  html, body { margin:0; height:100%; font-family: sans-serif; background:#e8e4dc; }
+  #bar { position:fixed; top:0; left:0; right:0; z-index:10; background:#3a3a3a; color:#eee;
+    padding:6px 10px; display:flex; gap:8px; align-items:center; font-size:13px; }
+  #bar button { background:#555; color:#eee; border:1px solid #777; border-radius:4px;
+    padding:3px 10px; cursor:pointer; font-size:13px; }
+  #bar button.on { background:#a06; border-color:#c8a; }
+  #bar .hint { opacity:.7; margin-left:12px; }
+  #stage { position:absolute; top:0; bottom:0; left:0; right:0; overflow:auto; }
+  #world { position:relative;
+    /* 方眼紙: 5mm 副線 / 10mm 主線 */
+    background-image:
+      linear-gradient(rgba(80,120,160,.10) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(80,120,160,.10) 1px, transparent 1px),
+      linear-gradient(rgba(80,120,160,.25) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(80,120,160,.25) 1px, transparent 1px);
+    background-size: 5mm 5mm, 5mm 5mm, 10mm 10mm, 10mm 10mm;
+    background-color:#f7f4ec;
+  }
+  .page { position:absolute; border:1px dashed #8a7f6a; background:rgba(255,255,255,.35);
+    pointer-events:none; }
+  .page .pnum { position:absolute; top:-1.4em; left:0; font-size:11px; color:#8a7f6a; }
+  .area { position:absolute; box-sizing:border-box; }
+  .area .drag { height:5mm; cursor:move; background:rgba(90,110,140,.18);
+    border:1px solid rgba(90,110,140,.4); border-bottom:none;
+    border-radius:3px 3px 0 0; font-size:10px; color:#667; padding:0 4px;
+    display:flex; align-items:center; justify-content:space-between; }
+  .area .drag select { font-size:10px; height:4mm; padding:0; cursor:default; }
+  .area textarea { width:100%; height:calc(100% - 5mm); display:block; box-sizing:border-box;
+    border:1px solid rgba(90,110,140,.4); border-top:none; resize:none;
+    background:rgba(255,255,255,.55); font-family:inherit; font-size:4mm; line-height:1.4;
+    padding:1mm; outline:none; overflow:hidden; }
+  .area.overflow textarea { border-color:#c33; box-shadow:0 0 0 2px rgba(200,40,40,.25); }
+  .area .rsz { position:absolute; right:-4px; bottom:-4px; width:10px; height:10px;
+    cursor:nwse-resize; background:#8a7f6a; border-radius:2px; }
+  .oflabel { position:absolute; right:2px; top:-1.5em; font-size:11px; color:#c33;
+    cursor:pointer; background:rgba(255,240,240,.85); padding:0 4px; border-radius:3px; }
+  #story { position:fixed; right:0; top:36px; bottom:0; width:320px; background:#fff;
+    border-left:1px solid #999; z-index:20; display:none; flex-direction:column; }
+  #story.open { display:flex; }
+  #story header { padding:6px 10px; font-size:12px; color:#555; background:#eee;
+    display:flex; justify-content:space-between; align-items:center; }
+  #story header button { border:none; background:none; font-size:16px; cursor:pointer; }
+  #story textarea { flex:1; resize:none; border:none; outline:none; padding:10px;
+    font-size:14px; line-height:1.6; }
+  /* ── 印刷用 ── */
+  #printout { display:none; }
+  #printout.open { display:block; position:fixed; inset:36px 0 0 0; z-index:30;
+    overflow:auto; background:#777; padding:24px 0; }
+  #printout .ppage { margin:0 auto 20px; box-shadow:0 2px 10px rgba(0,0,0,.45); }
+  #printout .pbar { position:sticky; top:0; text-align:center; margin-bottom:16px; z-index:1; }
+  #printout .pbar button { padding:6px 20px; font-size:14px; cursor:pointer; }
+  .ppage { position:relative; overflow:hidden; background:#fff; }
+  .parea { position:absolute; font-size:4mm; line-height:1.4;
+    white-space:pre-wrap; overflow:hidden; color:#000; }
+  .pfoot { position:absolute; bottom:5mm; right:10mm; font-size:10px; color:#333; }
+  @media print {
+    html,body { height:auto !important; overflow:visible !important; }
+    #bar,#stage,#story,#printout .pbar { display:none !important; }
+    #printout, #printout.open { display:block !important; position:static;
+      overflow:visible; background:none; padding:0; }
+    #printout .ppage { margin:0; box-shadow:none; page-break-after:always; }
+  }
+  #wires { position:absolute; inset:0; pointer-events:none; z-index:5; }
+  #wires path { pointer-events:stroke; cursor:pointer; }
+  #wires path.link { stroke:#a06; stroke-width:2; fill:none; stroke-dasharray:6 3; }
+  #wires path.sel { stroke:#c33; stroke-width:3; }
+  #wires path:hover { stroke:#c33; }
+  /* ── 画像配置 ── */
+  #imgdlg { position:fixed; inset:0; z-index:40; display:none;
+    background:rgba(0,0,0,.4); align-items:center; justify-content:center; }
+  #imgdlg.open { display:flex; }
+  #imgdlg .box { background:#fff; padding:16px; border-radius:8px; width:320px; }
+  #imgdlg img { max-width:100%; max-height:180px; display:block; margin:0 auto 10px; }
+  #imgdlg .row { display:flex; gap:8px; align-items:center; margin:6px 0; font-size:13px; }
+  #imgdlg input[type=number] { width:64px; }
+  #imgdlg .btns { text-align:right; margin-top:10px; }
+  .img { position:absolute; box-sizing:border-box; }
+  .img img { width:100%; height:100%; display:block; }
+  .img.ghost { opacity:.45; pointer-events:none; }
+</style>
+</head>
+<body>
+<div id="bar">
+  <strong>Silim Murlun spike</strong>
+  <button id="b-a4">A4</button>
+  <button id="b-a3">A3</button>
+  <button id="b-or">縦⇔横</button>
+  <button id="b-addp">＋ページ</button>
+  <button id="b-link">リンクモード</button>
+  <button id="b-img">画像</button>
+  <button id="b-print">印刷</button>
+  <span class="hint">用紙上をダブルクリックでテキストエリア / リンクモードで順に2クリック / 線をクリック→Delで巻き戻し切断</span>
+</div>
+<div id="stage"><div id="world"><svg id="wires"></svg></div></div>
+<div id="story"><header><span>連鎖テキスト全体（あふれ込み）</span>
+<button id="story-x">×</button></header><textarea id="story-ta" spellcheck="false"></textarea></div>
+<input id="imgfile" type="file" accept="image/*" style="display:none">
+<div id="imgdlg"><div class="box">
+  <img id="imgprev">
+  <div class="row">幅 <input id="imgw" type="number" step="0.1"> mm
+    高さ <input id="imgh" type="number" step="0.1"> mm</div>
+  <div class="row"><label><input id="imglock" type="checkbox" checked>
+    アスペクト比をロック</label></div>
+  <div class="btns"><button id="imgok">配置</button>
+  <button id="imgcancel">キャンセル</button></div>
+</div></div>
+<div id="printout">
+  <div class="pbar"><button id="p-do">印刷実行</button>
+  <button id="p-close">閉じる</button></div>
+  <div id="plist"></div>
+</div>
+
+<script>
+'use strict';
+const MM = 96 / 25.4;                 // 1mm = 96/25.4 px (96dpi)
+const SNAP = 5;                       // グリッド 5mm
+const PAGE_GAP = 12;                  // ページ間隔 mm
+const FONT_MM = 4, LINE_H = FONT_MM * 1.4;
+const SIZE = { A4:[210,297], A3:[297,420] };
+
+const world = document.getElementById('world');
+const wires = document.getElementById('wires');
+const stage = document.getElementById('stage');
+
+const S = {
+  paper: { size:'A4', landscape:false },
+  pageCount: 3,
+  seq: 1,
+  areas: new Map(),        // id -> {id,x,y,w,h,el} (mm)
+  chains: new Map(),       // chainId -> {areas:[id...], text}
+  chainOf: new Map(),      // areaId -> chainId
+  linkMode: false, linkFrom: null,
+  selLink: null,           // {chainId, idx}
+  imgs: [],                // {x,y,w,h,url,el}
+};
+
+const snap = v => Math.round(v / SNAP) * SNAP;
+// ポインタ座標(px) → ワールド mm
+const toMM = e => {
+  const r = world.getBoundingClientRect();
+  return { x:(e.clientX - r.left) / MM, y:(e.clientY - r.top) / MM };
+};
+
+// ── テキスト計測: canvas measureText。英単語は空白で折り返し、
+//    日本語等は文字単位で強制切断。slices の join === text を保証 ──
+const measCtx = document.createElement('canvas').getContext('2d');
+
+function fitText(text, maxWpx, maxHpx, fpx) {
+  measCtx.font = `${fpx}px sans-serif`;
+  const maxW = maxWpx;
+  const maxLines = Math.max(1, Math.floor(maxHpx / (fpx * 1.4)));
+  let pos = 0, lineStart = 0, lines = 0;
+  while (pos < text.length && lines < maxLines) {
+    const ch = text[pos];
+    if (ch === '\n') { lines++; pos++; lineStart = pos; continue; }
+    if (measCtx.measureText(text.slice(lineStart, pos+1)).width <= maxW) { pos++; continue; }
+    if (pos === lineStart) { pos++; continue; }           // 1字でも幅超過 → 強制進行
+    const sp = text.lastIndexOf(' ', pos);                // 直前の空白で切る（空白は前行末へ）
+    pos = (sp >= lineStart) ? sp + 1 : pos;
+    lineStart = pos;
+    lines++;
+  }
+  const show = text.slice(0, pos), rest = text.slice(pos);
+  return { show, rest, overflow: rest.length > 0 };
+}
+
+// ── 連鎖レイアウト ──
+function layout() {
+  for (const c of S.chains.values()) {
+    let rest = c.text;
+    c.areas.forEach((id, i) => {
+      const a = S.areas.get(id);
+      const ta = a.el.querySelector('textarea');
+      // 実測: textarea の内側寸法をそのまま容量に使う
+      // （padding 1mm×2 + border 1px×2 を差し引く）
+      const r = fitText(rest, ta.clientWidth - 2*MM - 2,
+                              ta.clientHeight - 2*MM - 2, a.fs * MM);
+      a.el.querySelector('textarea').value = r.show;
+      const last = i === c.areas.length - 1;
+      a.el.classList.toggle('overflow', last && r.overflow);
+      let lab = a.el.querySelector('.oflabel');
+      if (last && r.overflow) {
+        if (!lab) { lab = document.createElement('div'); lab.className='oflabel';
+          a.el.appendChild(lab); }
+        const pv = r.rest.replace(/\n/g,'⏎').slice(0, 14);
+        lab.textContent = `あふれ ${r.rest.length}字 「${pv}…」`;
+      } else if (lab) lab.remove();
+      rest = r.rest;
+    });
+  }
+  drawWires();
+}
+
+// ── ページ枠 ──
+function renderPages() {
+  for (const p of world.querySelectorAll('.page')) p.remove();
+  const [pw, ph] = SIZE[S.paper.size];
+  const W = S.paper.landscape ? ph : pw, H = S.paper.landscape ? pw : ph;
+  for (let i = 0; i < S.pageCount; i++) {
+    const d = document.createElement('div');
+    d.className = 'page';
+    d.style.left = '20mm'; d.style.top = (20 + i * (H + PAGE_GAP)) + 'mm';
+    d.style.width = W + 'mm'; d.style.height = H + 'mm';
+    d.innerHTML = `<span class="pnum">p.${i+1} — ${S.paper.size}${S.paper.landscape?'横':'縦'} ${W}×${H}mm</span>`;
+    world.appendChild(d);
+  }
+  world.style.width = (20 + W + 40) + 'mm';
+  world.style.height = (20 + S.pageCount * (H + PAGE_GAP) + 20) + 'mm';
+  drawWires();
+}
+
+// ── エリア ──
+function addArea(x, y) {
+  const id = 'a' + S.seq++;
+  const a = { id, x:snap(x), y:snap(y), w:60, h:45, fs:4 };
+  S.areas.set(id, a);
+  const cid = 'c' + S.seq++;
+  S.chains.set(cid, { areas:[id], text:'' });
+  S.chainOf.set(id, cid);
+
+  const el = document.createElement('div');
+  el.className = 'area'; el.dataset.id = id;
+  el.innerHTML = `<div class="drag"><span>${id}</span>` +
+    `<select class="fsel"><option>3</option><option selected>4</option>` +
+    `<option>5</option><option>7</option><option>9</option></select></div>` +
+    `<textarea spellcheck="false"></textarea><div class="rsz"></div>`;
+  const ta = el.querySelector('textarea');
+  // フォントサイズ変更（エリア単位）→ 連鎖全体が再配分される
+  el.querySelector('.fsel').addEventListener('change', e => {
+    a.fs = +e.currentTarget.value;
+    ta.style.fontSize = a.fs + 'mm';
+    layout();
+  });
+  ta.style.fontSize = a.fs + 'mm';
+  // エリアは表示専用。入力は常に右の連鎖編集ペインで行い、
+  // エリアには分断されたスライスだけをリアルタイム反映する
+  ta.readOnly = true;
+  ta.addEventListener('click', () => openStory(S.chainOf.get(id)));
+  ta.addEventListener('focus', () => openStory(S.chainOf.get(id)));
+  a.el = el; place(a);
+  world.appendChild(el);
+  openStory(cid);
+  return a;
+}
+function place(a) {
+  a.el.style.left = a.x+'mm'; a.el.style.top = a.y+'mm';
+  a.el.style.width = a.w+'mm'; a.el.style.height = a.h+'mm';
+}
+
+// ドラッグ移動（帯）・右下リサイズ
+let drag = null;
+world.addEventListener('pointerdown', e => {
+  const hd = e.target.closest('.drag'), rz = e.target.closest('.rsz');
+  if (e.target.tagName === 'SELECT') return;
+  if (!hd && !rz) return;
+  const id = (hd ?? rz).closest('.area').dataset.id;
+  const a = S.areas.get(id), p = toMM(e);
+  drag = { id, rsz: !!rz, ax: a.x, ay: a.y, px: p.x, py: p.y };
+  (hd ?? rz).setPointerCapture(e.pointerId);
+});
+world.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const a = S.areas.get(drag.id), p = toMM(e);
+  if (drag.rsz) {
+    a.w = Math.max(20, snap(p.x - a.x));
+    a.h = Math.max(15, snap(p.y - a.y));
+  } else {
+    a.x = snap(drag.ax + p.x - drag.px);
+    a.y = snap(drag.ay + p.y - drag.py);
+  }
+  place(a); layout();
+});
+world.addEventListener('pointerup', () => { drag = null; });
+
+// ダブルクリックでテキストエリア生成
+world.addEventListener('dblclick', e => {
+  if (e.target.closest('.area') || S.linkMode || IMG.placing) return;
+  const p = toMM(e);
+  addArea(p.x - 2, p.y - 2);
+});
+
+// ── リンク ──
+// あふれバッジ → 連鎖全体エディタ（ストーリーエディタ）
+let storyChain = null;
+const storyBox = document.getElementById('story');
+const storyTa = document.getElementById('story-ta');
+function openStory(cid) {
+  storyChain = cid;
+  storyTa.value = S.chains.get(cid).text;
+  storyBox.classList.add('open');
+  storyTa.focus();
+}
+world.addEventListener('click', e => {
+  const ofl = e.target.closest('.oflabel');
+  if (ofl) {
+    openStory(S.chainOf.get(ofl.closest('.area').dataset.id));
+    return;
+  }
+});
+storyTa.addEventListener('input', () => {
+  const c = storyChain && S.chains.get(storyChain);
+  if (!c) return;
+  c.text = storyTa.value;
+  layout();
+});
+document.getElementById('story-x').onclick = () => {
+  storyBox.classList.remove('open'); storyChain = null;
+};
+
+world.addEventListener('click', e => {
+  if (IMG.placing) return;
+  const path = e.target.closest('path.link');
+  if (path) {
+    S.selLink = { chainId: path.dataset.c, idx: +path.dataset.i };
+    drawWires();
+    return;
+  }
+  const ar = e.target.closest('.area');
+  if (S.linkMode && ar) {
+    const id = ar.dataset.id;
+    if (!S.linkFrom) { S.linkFrom = id; return; }
+    if (S.linkFrom !== id) linkChains(S.linkFrom, id);
+    S.linkFrom = null; S.linkMode = false;
+    document.getElementById('b-link').classList.remove('on');
+  }
+});
+
+function linkChains(fromId, toId) {
+  const cid1 = S.chainOf.get(fromId), cid2 = S.chainOf.get(toId);
+  const c1 = S.chains.get(cid1), c2 = S.chains.get(cid2);
+  if (c1 === c2) return;
+  c1.areas.push(...c2.areas);
+  c1.text = c1.text + (c1.text && c2.text ? '\n' : '') + c2.text;
+  for (const id of c2.areas) S.chainOf.set(id, cid1);
+  S.chains.delete(cid2);
+  layout();
+}
+// idx 番目と idx+1 番目の間を切る → 全テキストを head 側へ巻き戻す
+function unlink(chainId, idx) {
+  const c = S.chains.get(chainId);
+  const tail = c.areas.splice(idx + 1);
+  const cid = 'c' + S.seq++;
+  S.chains.set(cid, { areas: tail, text: '' });
+  for (const id of tail) S.chainOf.set(id, cid);
+  layout();
+}
+
+function drawWires() {
+  wires.innerHTML = '';
+  for (const [cid, c] of S.chains) {
+    for (let i = 0; i < c.areas.length - 1; i++) {
+      const A = S.areas.get(c.areas[i]), B = S.areas.get(c.areas[i+1]);
+      const p = document.createElementNS('http://www.w3.org/2000/svg','path');
+      const x1 = (A.x + A.w)*MM, y1 = (A.y + A.h/2)*MM;
+      const x2 = B.x*MM, y2 = (B.y + B.h/2)*MM;
+      const mx = (x1 + x2) / 2;
+      p.setAttribute('d', `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`);
+      p.setAttribute('class','link' +
+        (S.selLink && S.selLink.chainId===cid && S.selLink.idx===i ? ' sel':''));
+      p.dataset.c = cid; p.dataset.i = i;
+      wires.appendChild(p);
+    }
+  }
+  wires.setAttribute('width', world.scrollWidth);
+  wires.setAttribute('height', world.scrollHeight);
+}
+
+// ── キー操作 ──
+document.addEventListener('keydown', e => {
+  if (e.key === 'Delete' && S.selLink && document.activeElement.tagName !== 'TEXTAREA') {
+    unlink(S.selLink.chainId, S.selLink.idx);
+    S.selLink = null;
+  }
+});
+
+// ── ツールバー ──
+document.getElementById('b-a4').onclick = () => { S.paper.size='A4'; renderPages(); };
+document.getElementById('b-a3').onclick = () => { S.paper.size='A3'; renderPages(); };
+document.getElementById('b-or').onclick = () => { S.paper.landscape=!S.paper.landscape; renderPages(); };
+document.getElementById('b-addp').onclick = () => { S.pageCount++; renderPages(); };
+document.getElementById('b-link').onclick = e => {
+  S.linkMode = !S.linkMode; S.linkFrom = null;
+  e.currentTarget.classList.toggle('on', S.linkMode);
+};
+
+// ── 印刷: 同じドキュメント内にページ展開オーバーレイを作り、
+//    その中の「印刷実行」で window.print() ──
+const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function buildPrint() {
+  const [pw, ph] = SIZE[S.paper.size];
+  const W = S.paper.landscape ? ph : pw, H = S.paper.landscape ? pw : ph;
+  const LEFT = 20;
+  const list = document.getElementById('plist');
+  list.innerHTML = '';
+  const st = document.createElement('style');
+  st.textContent = `@page { size:${S.paper.size} ${S.paper.landscape?'landscape':'portrait'}; margin:0; }`;
+  list.appendChild(st);
+  for (let i = 0; i < S.pageCount; i++) {
+    const py = 20 + i * (H + PAGE_GAP);
+    let inner = '';
+    for (const a of S.areas.values()) {
+      if (a.x + a.w <= LEFT || a.x >= LEFT + W ||
+          a.y + a.h <= py   || a.y >= py + H) continue;
+      inner += `<div class="parea" style="left:${a.x-LEFT}mm;top:${a.y-py}mm;` +
+               `width:${a.w}mm;height:${a.h-5}mm;font-size:${a.fs}mm">` +
+               esc(a.el.querySelector('textarea').value) + '</div>';
+    }
+    for (const im of S.imgs) {
+      if (im.x + im.w <= LEFT || im.x >= LEFT + W ||
+          im.y + im.h <= py   || im.y >= py + H) continue;
+      inner += `<img class="parea" src="${im.url}" ` +
+               `style="left:${im.x-LEFT}mm;top:${im.y-py}mm;` +
+               `width:${im.w}mm;height:${im.h}mm">`;
+    }
+    const d = document.createElement('div');
+    d.className = 'ppage';
+    d.style.cssText = `width:${W}mm;height:${H}mm`;
+    d.innerHTML = inner + `<div class="pfoot">${i+1} / ${S.pageCount}</div>`;
+    list.appendChild(d);
+  }
+}
+document.getElementById('b-print').onclick = () => {
+  buildPrint();
+  document.getElementById('printout').classList.add('open');
+};
+// Ctrl+P / ブラウザの印刷メニューでも印刷用 DOM を組み立てる
+window.addEventListener('beforeprint', () => {
+  buildPrint();
+  document.getElementById('printout').classList.add('open');
+});
+document.getElementById('p-do').onclick = () => window.print();
+document.getElementById('p-close').onclick = () =>
+  document.getElementById('printout').classList.remove('open');
+
+// ── 画像配置フロー: 選択→プレビュー/mm指定→ゴースト追従→クリック確定 ──
+const IMG = { url:null, ratio:1, placing:false, ghost:null };
+const $id = x => document.getElementById(x);
+$id('b-img').onclick = () => $id('imgfile').click();
+$id('imgfile').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  IMG.url = URL.createObjectURL(f);
+  const probe = new Image();
+  probe.onload = () => {
+    IMG.ratio = probe.naturalHeight / probe.naturalWidth;
+    $id('imgw').value = (probe.naturalWidth / MM).toFixed(1);
+    $id('imgh').value = (probe.naturalHeight / MM).toFixed(1);
+    $id('imgprev').src = IMG.url;
+    $id('imgdlg').classList.add('open');
+  };
+  probe.src = IMG.url;
+  e.target.value = '';
+});
+$id('imglock').addEventListener('change', e => {
+  if (e.target.checked)
+    $id('imgh').value = (+$id('imgw').value * IMG.ratio).toFixed(1);
+});
+$id('imgw').addEventListener('input', () => {
+  if ($id('imglock').checked)
+    $id('imgh').value = (+$id('imgw').value * IMG.ratio).toFixed(1);
+});
+$id('imgh').addEventListener('input', () => {
+  if ($id('imglock').checked)
+    $id('imgw').value = (+$id('imgh').value / IMG.ratio).toFixed(1);
+});
+$id('imgcancel').onclick = () => $id('imgdlg').classList.remove('open');
+$id('imgok').onclick = () => {
+  $id('imgdlg').classList.remove('open');
+  IMG.placing = true;
+  const g = document.createElement('div');
+  g.className = 'img ghost';
+  g.style.width = $id('imgw').value + 'mm';
+  g.style.height = $id('imgh').value + 'mm';
+  g.innerHTML = `<img src="${IMG.url}">`;
+  IMG.ghost = g;
+  world.appendChild(g);
+};
+world.addEventListener('pointermove', e => {
+  if (!IMG.placing || !IMG.ghost) return;
+  const p = toMM(e);
+  IMG.ghost.style.left = snap(p.x) + 'mm';
+  IMG.ghost.style.top  = snap(p.y) + 'mm';
+});
+world.addEventListener('click', e => {
+  if (!IMG.placing) return;
+  const p = toMM(e), g = IMG.ghost;
+  g.classList.remove('ghost');
+  g.style.left = snap(p.x) + 'mm';
+  g.style.top  = snap(p.y) + 'mm';
+  S.imgs.push({ x:snap(p.x), y:snap(p.y),
+    w:+$id('imgw').value, h:+$id('imgh').value, url:IMG.url, el:g });
+  IMG.placing = false; IMG.ghost = null;
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && IMG.placing) {
+    IMG.ghost.remove(); IMG.ghost = null; IMG.placing = false;
+  }
+});
+
+renderPages();
+const demo = addArea(30, 30);
+S.chains.get(S.chainOf.get(demo.id)).text =
+  'ここはテキストエリアのスパイクです。長い文章を入れるとエリアの高さからあふれ、リンクした次のエリアへ流れ込みます。改行もそのまま流れます。\nリンクモードでこのエリア→次ページのエリアを接続してみてください。文字がページをまたいで流れます。線をクリックして Del を押すと切断して巻き戻ります。';
+layout();
+</script>
+</body>
+</html>

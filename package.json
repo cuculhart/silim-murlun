@@ -1,0 +1,22 @@
+{
+  "name": "silim-murlun",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A graph-paper layout editor for printed documents — true millimeter units, linked text frames, browser-native printing.",
+  "type": "module",
+  "workspaces": [
+    "kimetron/packages/*",
+    "inimbal",
+    "app"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w silim-app",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "vitest run --passWithNoTests"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.4"
+  }
+}
