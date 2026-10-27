@@ -6,7 +6,7 @@ import type { TFunc } from './i18n';
 import { tf } from './i18n';
 
 export type Theme = 'standard' | 'light' | 'dark' | 'quiet';
-export type ShapeTool = 'rect' | 'ellipse' | 'line';
+export type ShapeTool = 'rect' | 'ellipse' | 'line' | 'curve';
 
 const THEMES: { value: Theme; key: string }[] = [
   { value: 'standard', key: 'theme.standard' },
@@ -138,6 +138,10 @@ export function MenuPane({
       {item('／', t('menu.line'), () => onShapeTool(shapeTool === 'line' ? null : 'line'), {
         on: shapeTool === 'line',
         title: t('menu.lineTip'),
+      })}
+      {item('〜', t('menu.curve'), () => onShapeTool(shapeTool === 'curve' ? null : 'curve'), {
+        on: shapeTool === 'curve',
+        title: t('menu.curveTip'),
       })}
       <div className="m-sep" />
       {item('頁', t('menu.addPage'), onAddPage, { enIc: 'P' })}

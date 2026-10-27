@@ -1,12 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { IsleCanvas, useEngine, useEngineVersion } from '@kimetron/react';
-import {
-  formatLength,
-  isShapeKind,
-  type Engine,
-  type WorldObject,
-} from '@kimetron/core';
+import { formatLength, type Engine, type WorldObject } from '@kimetron/core';
 import {
   addPage,
   applyVerticalShift,
@@ -28,7 +23,6 @@ import {
 } from 'inimbal';
 import { RightDock } from './Inspector';
 import { LinkWires, type LinkSel } from './LinkWires';
-import { ShapeGrips } from './Grips';
 import { MenuPane, type ShapeTool, type Theme } from './MenuPane';
 import { PageNav } from './PageNav';
 import { Printout } from './Printout';
@@ -843,7 +837,11 @@ export function App() {
         />
         <div
           ref={canvasRef}
-          className={linkMode ? 'canvas-wrap link-mode' : 'canvas-wrap'}
+          className={
+            'canvas-wrap' +
+            (linkMode ? ' link-mode' : '') +
+            (shapeTool ? ' drawing' : '')
+          }
           onClick={onCanvasClick}
           onDoubleClick={onDblClick}
           onPointerDown={(e) => {
@@ -927,13 +925,6 @@ export function App() {
             selLink={selLink}
             onPick={setSelLink}
           />
-          {selObj && isShapeKind(selObj.kind) && !shapeTool && (
-            <ShapeGrips
-              engine={engine}
-              obj={selObj}
-              onApply={(patch) => patchObject(selObj.id, patch)}
-            />
-          )}
           {shapeTool && (
             <div
               className="shape-overlay"
@@ -1023,6 +1014,26 @@ export function App() {
                           },
                           data: {},
                         }
+                      : shapeTool === 'curve'
+                        ? {
+                            id,
+                            kind: 'curve',
+                            x,
+                            y,
+                            w,
+                            h,
+                            // ドラッグ領域に沿う浅い弧 — 生成後は頂点
+                            // グリップで形を整える（kimetron P48）
+                            shape: {
+                              points: [
+                                { fx: 0, fy: 0.5 },
+                                { fx: 0.5, fy: 0 },
+                                { fx: 1, fy: 0.5 },
+                              ],
+                            },
+                            style: { stroke: '#333333', width: MM_PX * 0.5 },
+                            data: {},
+                          }
                       : {
                           id,
                           kind: 'line',

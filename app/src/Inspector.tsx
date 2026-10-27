@@ -372,6 +372,8 @@ function ShapeProps({
         </span>
       </header>
       <div className="doc-props-grid">
+        {/* line/curve は fill 非対応（開いた chord のため塗りは常に none） */}
+        {!isLine && (
         <label>
           {t('shape.fill')}
           <span className="col-alpha">
@@ -398,6 +400,7 @@ function ShapeProps({
             %
           </span>
         </label>
+        )}
         <label>
           {t('shape.stroke')}
           <span className="col-alpha">

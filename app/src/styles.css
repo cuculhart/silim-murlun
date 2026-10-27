@@ -214,29 +214,11 @@ body,
   cursor: pointer;
 }
 
-/* ── シェイプ頂点グリップ（F21） ── */
-.grips {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.grip {
-  position: absolute;
-  width: 8px;
-  height: 8px;
-  margin: -4px 0 0 -4px;
-  background: #fff;
-  border: 1.5px solid var(--accent);
-  box-sizing: border-box;
-  border-radius: 2px;
-  cursor: move;
-  pointer-events: auto;
-  z-index: 12;
-}
-
-.grip:hover {
-  background: var(--accent);
+/* ── シェイプ頂点グリップ（F21 → kimetron P48） ── */
+/* 頂点ハンドルは kimetron の .ki-vtx が描画・入力を担う。
+   シェイプツール起動中は描画オーバーレイの下に出ないよう隠す。 */
+.canvas-wrap.drawing .ki-vtx {
+  display: none;
 }
 
 /* ── ページ枠 ── */

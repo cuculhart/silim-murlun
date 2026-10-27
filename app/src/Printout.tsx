@@ -2,7 +2,11 @@
 // ページごとに版面だけを実寸（mm）で並べ、n / 全ページ のフッターを付ける。
 // @media print で編集画面を隠し、@page で用紙サイズ・向きを動的設定する。
 
-import { renderOrder, type WorldObject } from '@kimetron/core';
+import {
+  catmullRomPolyline,
+  renderOrder,
+  type WorldObject,
+} from '@kimetron/core';
 import { pageRects, type PageModel } from 'inimbal';
 import {
   DEFAULT_TEXT_DATA,
@@ -97,9 +101,9 @@ export function Printout({
                   />
                 );
               }
-              if (o.kind === 'line') {
+              if (o.kind === 'line' || o.kind === 'curve') {
                 const wMm = (o.style?.width ?? MM_PX * 0.5) / MM_PX;
-                const pts = o.shape?.points ?? [
+                const anchors = o.shape?.points ?? [
                   { fx: 0, fy: 0 },
                   { fx: 1, fy: 1 },
                 ];
@@ -108,6 +112,16 @@ export function Printout({
                 const vw = Math.max(o.w, 0.1);
                 const vh = Math.max(o.h, 0.1);
                 const col = o.style?.stroke ?? '#333';
+                // viewBox ローカル mm に投影 — curve は Catmull-Rom で展開
+                const lp = anchors.map((p) => ({
+                  x: p.fx * vw,
+                  y: p.fy * vh,
+                }));
+                const pp =
+                  o.kind === 'curve' ? catmullRomPolyline(lp) : lp;
+                const d = pp
+                  .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`)
+                  .join(' ');
                 const ms = `pmk-${o.id}-s`;
                 const me = `pmk-${o.id}-e`;
                 const cap = (id: string, kind: string) =>
@@ -154,11 +168,9 @@ export function Printout({
                       {o.style?.capStart && cap(ms, o.style.capStart)}
                       {o.style?.capEnd && cap(me, o.style.capEnd)}
                     </defs>
-                    <line
-                      x1={pts[0].fx * vw}
-                      y1={pts[0].fy * vh}
-                      x2={pts[1].fx * vw}
-                      y2={pts[1].fy * vh}
+                    <path
+                      d={d}
+                      fill="none"
                       stroke={col}
                       strokeWidth={wMm}
                       strokeDasharray={o.style?.dash
