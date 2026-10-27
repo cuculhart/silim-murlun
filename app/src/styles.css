@@ -214,6 +214,31 @@ body,
   cursor: pointer;
 }
 
+/* ── シェイプ頂点グリップ（F21） ── */
+.grips {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.grip {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  background: #fff;
+  border: 1.5px solid var(--accent);
+  box-sizing: border-box;
+  border-radius: 2px;
+  cursor: move;
+  pointer-events: auto;
+  z-index: 12;
+}
+
+.grip:hover {
+  background: var(--accent);
+}
+
 /* ── ページ枠 ── */
 .ki-kind-page {
   border: 1px dashed var(--muted);
@@ -267,6 +292,10 @@ body,
 .doc-props-grid .ins-row input {
   width: 48px;
 }
+
+/* 暫定CSS撤去（kimetron 1.4.1）: .ki-obj の枠幅は style.width 由来に
+   なったため、rect は kimetron ネイティブの描画に任せる。
+   ellipse/line は .ki-shape 側のスタイルが適用される。 */
 
 /* ── テキストエリア（表示専用スライス） ── */
 .ki-kind-textarea {
@@ -393,6 +422,7 @@ body,
 
 .chain-font {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   padding: 6px 10px;
   font-size: 12px;
@@ -483,6 +513,16 @@ body,
   color: var(--text);
   border: 1px solid var(--line);
   border-radius: 4px;
+}
+
+.doc-props-grid .col-alpha {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.doc-props-grid .col-alpha input[type='number'] {
+  width: 54px;
 }
 
 .doc-props-grid button {

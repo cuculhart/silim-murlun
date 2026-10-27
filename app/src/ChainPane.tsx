@@ -83,6 +83,40 @@ export function ChainPane({
               ))}
             </select>
           </label>
+          <label>
+            {t('font.color')}
+            <input
+              type="color"
+              value={areaData.color ?? '#222222'}
+              onChange={(e) => onAreaData({ color: e.currentTarget.value })}
+            />
+          </label>
+          <label>
+            B
+            <input
+              type="checkbox"
+              checked={!!areaData.bold}
+              onChange={(e) => onAreaData({ bold: e.currentTarget.checked })}
+            />
+          </label>
+          <label>
+            I
+            <input
+              type="checkbox"
+              checked={!!areaData.italic}
+              onChange={(e) => onAreaData({ italic: e.currentTarget.checked })}
+            />
+          </label>
+          <label>
+            U
+            <input
+              type="checkbox"
+              checked={!!areaData.underline}
+              onChange={(e) =>
+                onAreaData({ underline: e.currentTarget.checked })
+              }
+            />
+          </label>
         </div>
       )}
       <footer className="chain-links">

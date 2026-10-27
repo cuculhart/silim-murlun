@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { IsleCanvas, useEngine, useEngineVersion } from '@kimetron/react';
-import { formatLength, type Engine, type WorldObject } from '@kimetron/core';
+import {
+  formatLength,
+  isShapeKind,
+  type Engine,
+  type WorldObject,
+} from '@kimetron/core';
 import {
   addPage,
   applyVerticalShift,
@@ -23,6 +28,7 @@ import {
 } from 'inimbal';
 import { RightDock } from './Inspector';
 import { LinkWires, type LinkSel } from './LinkWires';
+import { ShapeGrips } from './Grips';
 import { MenuPane, type ShapeTool, type Theme } from './MenuPane';
 import { PageNav } from './PageNav';
 import { Printout } from './Printout';
@@ -122,7 +128,7 @@ export function App() {
     () => (localStorage.getItem('silim-lang') as Lang) || 'ja',
   );
   const t = makeT(lang);
-  const [pageOpacity, setPageOpacity] = useState(100);
+  const [pageOpacity, setPageOpacity] = useState(50);
   const [footer, setFooter] = useState(true);
   const [navCollapsed, setNavCollapsed] = useState(false);
   const [activePage, setActivePage] = useState(0);
@@ -382,6 +388,30 @@ export function App() {
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, []);
 
+  // F24: Alt 押下でスナップ（グリッド＋オブジェクト吸着）を一時解除
+  useEffect(() => {
+    const set = (off: boolean) => {
+      engine.snapObjects = !off;
+      engine.doc.grid.snap = !off;
+    };
+    const down = (e: KeyboardEvent) => {
+      if (e.key === 'Alt') set(true);
+    };
+    const up = (e: KeyboardEvent) => {
+      if (e.key === 'Alt') set(false);
+    };
+    const blur = () => set(false); // フォーカス喪失で取り残さない
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    window.addEventListener('blur', blur);
+    return () => {
+      window.removeEventListener('keydown', down);
+      window.removeEventListener('keyup', up);
+      window.removeEventListener('blur', blur);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // G3: 用紙の透過 → ページ枠オブジェクトの fill を即時反映
   useEffect(() => {
     engine.setDoc({
@@ -408,7 +438,7 @@ export function App() {
     setChains([]);
     setFooter(true);
     setDocTitle('');
-    setPageOpacity(100);
+    setPageOpacity(50);
     createdAtRef.current = new Date().toISOString();
     dirtyRef.current = false;
     engine.setSelection([]);
@@ -491,10 +521,7 @@ export function App() {
       y: Math.round(w.y / gs) * gs,
       w: 60,
       h: 45,
-      style: {
-        fill: 'rgba(255,255,255,0.55)',
-        stroke: 'rgba(90,110,140,0.4)',
-      },
+      style: { stroke: 'rgba(90,110,140,0.4)' },
       data: { ...DEFAULT_TEXT_DATA },
     });
     setChains((cs) => [
@@ -643,6 +670,8 @@ export function App() {
           height: Math.max(0, r.h - 2 * TEXT_PAD_MM),
           fontSize: d.fontSize,
           fontFamily: d.fontFamily,
+          bold: d.bold,
+          italic: d.italic,
         },
       ];
     });
@@ -734,6 +763,9 @@ export function App() {
             lineHeight: LINE_HEIGHT,
             fontFamily: d.fontFamily,
             color: d.color,
+            fontWeight: d.bold ? 'bold' : undefined,
+            fontStyle: d.italic ? 'italic' : undefined,
+            textDecoration: d.underline ? 'underline' : undefined,
           }}
         >
           <div className="ta-slice">{slice}</div>
@@ -761,19 +793,9 @@ export function App() {
       const d = o.data as ImageData;
       return <img className="img-fill" src={d.url} draggable={false} alt="" />;
     }
-    if (o.kind === 'rect') {
-      return (
-        <div
-          style={{
-            width: '100%',
-            height: '100%',
-            boxSizing: 'border-box',
-            background: o.style?.fill,
-            border: `${o.style?.width ?? 1}px solid ${o.style?.stroke ?? 'transparent'}`,
-          }}
-        />
-      );
-    }
+    // rect は kimetron 1.4.1 のネイティブ描画（ki-obj の
+    // background/border = style 由来）に任せるため中身なし
+    if (o.kind === 'rect') return null;
     return undefined;
   };
 
@@ -905,6 +927,13 @@ export function App() {
             selLink={selLink}
             onPick={setSelLink}
           />
+          {selObj && isShapeKind(selObj.kind) && !shapeTool && (
+            <ShapeGrips
+              engine={engine}
+              obj={selObj}
+              onApply={(patch) => patchObject(selObj.id, patch)}
+            />
+          )}
           {shapeTool && (
             <div
               className="shape-overlay"
@@ -936,14 +965,33 @@ export function App() {
                 });
                 const gs = engine.doc.grid.size || 5;
                 const sn = (v: number) => Math.round(v / gs) * gs;
+                const dx = Math.abs(a.x - b.x);
+                const dy = Math.abs(a.y - b.y);
                 const x = sn(Math.min(a.x, b.x));
                 const y = sn(Math.min(a.y, b.y));
-                const w = Math.max(1, sn(Math.abs(a.x - b.x)));
-                const h = Math.max(
-                  shapeTool === 'line' ? 1 : gs,
-                  sn(Math.abs(a.y - b.y)),
-                );
+                const w = Math.max(1, sn(dx));
+                const h = Math.max(shapeTool === 'line' ? 1 : gs, sn(dy));
                 const id = nextId('sh');
+                // 線の chord — 水平/垂直に潰れたドラッグは対角ではなく
+                // 辺中央アンカーの真っ直ぐな線にする（sethera 準拠）。
+                // 先頭点 = ドラッグ始点（端子の向きのため保持）
+                const fx0 = a.x <= b.x ? 0 : 1;
+                const fy0 = a.y <= b.y ? 0 : 1;
+                const linePts =
+                  sn(dy) === 0
+                    ? [
+                        { fx: fx0, fy: 0.5 },
+                        { fx: 1 - fx0, fy: 0.5 },
+                      ]
+                    : sn(dx) === 0
+                      ? [
+                          { fx: 0.5, fy: fy0 },
+                          { fx: 0.5, fy: 1 - fy0 },
+                        ]
+                      : [
+                          { fx: fx0, fy: fy0 },
+                          { fx: 1 - fx0, fy: 1 - fy0 },
+                        ];
                 const obj: WorldObject =
                   shapeTool === 'rect'
                     ? {
@@ -954,7 +1002,7 @@ export function App() {
                         w,
                         h,
                         style: {
-                          fill: 'rgba(58,123,213,0.12)',
+                          fill: '#3a7bd51f',
                           stroke: '#3a7bd5',
                           width: MM_PX * 0.5,
                         },
@@ -969,7 +1017,7 @@ export function App() {
                           w,
                           h,
                           style: {
-                            fill: 'rgba(58,123,213,0.10)',
+                            fill: '#3a7bd51a',
                             stroke: '#3a7bd5',
                             width: MM_PX * 0.5,
                           },
@@ -982,18 +1030,7 @@ export function App() {
                           y,
                           w,
                           h,
-                          shape: {
-                            points:
-                              a.y <= b.y
-                                ? [
-                                    { fx: 0, fy: 0 },
-                                    { fx: 1, fy: 1 },
-                                  ]
-                                : [
-                                    { fx: 0, fy: 1 },
-                                    { fx: 1, fy: 0 },
-                                  ],
-                          },
+                          shape: { points: linePts },
                           style: { stroke: '#333333', width: MM_PX * 0.5 },
                           data: {},
                         };

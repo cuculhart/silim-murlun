@@ -17,6 +17,8 @@ export interface AreaBox {
   fontSize?: number;
   /** フォントファミリ（CSS 名）。省略時は計測側の既定 */
   fontFamily?: string;
+  bold?: boolean;
+  italic?: boolean;
 }
 
 /** テキスト計測の注入インターフェース */

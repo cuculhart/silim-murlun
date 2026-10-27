@@ -29,6 +29,9 @@ export interface TextAreaData {
   fontFamily: string;
   /** 文字色 */
   color?: string;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
 }
 
 export const DEFAULT_TEXT_DATA: TextAreaData = {

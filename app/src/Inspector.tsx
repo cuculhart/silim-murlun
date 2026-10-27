@@ -2,7 +2,13 @@
 // 右方向に折りたたみ可（G4）。
 
 import { useState } from 'react';
-import { isShapeKind, type WorldObject, type ZOrder } from '@kimetron/core';
+import {
+  isShapeKind,
+  shapeAnchors,
+  type EdgeMarker,
+  type WorldObject,
+  type ZOrder,
+} from '@kimetron/core';
 import type { Chain } from 'inimbal';
 import type { TFunc } from './i18n';
 import { tf } from './i18n';
@@ -18,6 +24,28 @@ import {
 
 const isShape = (o: WorldObject) =>
   o.kind === 'rect' || isShapeKind(o.kind);
+
+interface StylePatch {
+  fill?: string;
+  stroke?: string;
+  width?: number;
+  dash?: number[];
+  capStart?: EdgeMarker;
+  capEnd?: EdgeMarker;
+}
+
+/** 線種プリセット — kimetron の dash は screen px 規格 */
+const DASHES: { key: string; value: number[] | undefined }[] = [
+  { key: 'shape.solid', value: undefined },
+  { key: 'shape.dashed', value: [6, 3] },
+  { key: 'shape.dotted', value: [1, 2] },
+];
+
+const CAPS: { value: '' | EdgeMarker; key: string }[] = [
+  { value: '', key: 'shape.capNone' },
+  { value: 'arrow', key: 'shape.capArrow' },
+  { value: 'dot', key: 'shape.capDot' },
+];
 
 const ZOPS: { op: ZOrder; key: string }[] = [
   { op: 'front', key: 'z.front' },
@@ -106,7 +134,7 @@ export function RightDock({
   onAreaDataAll: (patch: Partial<TextAreaData>) => void;
   onRect: (r: { x: number; y: number; w: number; h: number }) => void;
   onImageData: (patch: Partial<ImageData>) => void;
-  onStyle: (patch: { fill?: string; stroke?: string; width?: number }) => void;
+  onStyle: (patch: StylePatch) => void;
   onReorder: (op: ZOrder) => void;
   onDeselect: () => void;
   onAddArea: () => void;
@@ -284,6 +312,27 @@ function FontBatch({
             onChange={(e) => onApply({ color: e.currentTarget.value })}
           />
         </label>
+        <label>
+          B
+          <input
+            type="checkbox"
+            onChange={(e) => onApply({ bold: e.currentTarget.checked })}
+          />
+        </label>
+        <label>
+          I
+          <input
+            type="checkbox"
+            onChange={(e) => onApply({ italic: e.currentTarget.checked })}
+          />
+        </label>
+        <label>
+          U
+          <input
+            type="checkbox"
+            onChange={(e) => onApply({ underline: e.currentTarget.checked })}
+          />
+        </label>
       </div>
       <footer className="hint">{t('font.batchHint')}</footer>
     </div>
@@ -297,14 +346,23 @@ function ShapeProps({
   t,
 }: {
   objs: WorldObject[];
-  onStyle: (p: { fill?: string; stroke?: string; width?: number }) => void;
+  onStyle: (p: StylePatch) => void;
   onReorder: (op: ZOrder) => void;
   t: TFunc;
 }) {
   const o = objs[0];
   const fill = o.style?.fill ?? '#00000000';
   const stroke = o.style?.stroke ?? '#333333';
+  const fillA = alphaOf(fill);
+  const strokeA = alphaOf(stroke);
   const wMm = (o.style?.width ?? MM_PX) / MM_PX;
+  const isLine = o.kind === 'line' || o.kind === 'curve';
+  const dashIdx = Math.max(
+    0,
+    DASHES.findIndex(
+      (d) => JSON.stringify(d.value) === JSON.stringify(o.style?.dash),
+    ),
+  );
   return (
     <div className="doc-props">
       <header>
@@ -316,19 +374,57 @@ function ShapeProps({
       <div className="doc-props-grid">
         <label>
           {t('shape.fill')}
-          <input
-            type="color"
-            value={toHex(fill)}
-            onChange={(e) => onStyle({ fill: e.currentTarget.value })}
-          />
+          <span className="col-alpha">
+            <input
+              type="color"
+              value={toHex(fill)}
+              onChange={(e) =>
+                onStyle({ fill: withAlpha(e.currentTarget.value, fillA || 1) })
+              }
+            />
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step={1}
+              title={t('shape.alpha')}
+              value={Math.round(fillA * 100)}
+              onChange={(e) =>
+                onStyle({
+                  fill: withAlpha(toHex(fill), +e.currentTarget.value / 100),
+                })
+              }
+            />
+            %
+          </span>
         </label>
         <label>
           {t('shape.stroke')}
-          <input
-            type="color"
-            value={toHex(stroke)}
-            onChange={(e) => onStyle({ stroke: e.currentTarget.value })}
-          />
+          <span className="col-alpha">
+            <input
+              type="color"
+              value={toHex(stroke)}
+              onChange={(e) =>
+                onStyle({
+                  stroke: withAlpha(e.currentTarget.value, strokeA || 1),
+                })
+              }
+            />
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step={1}
+              title={t('shape.alpha')}
+              value={Math.round(strokeA * 100)}
+              onChange={(e) =>
+                onStyle({
+                  stroke: withAlpha(toHex(stroke), +e.currentTarget.value / 100),
+                })
+              }
+            />
+            %
+          </span>
         </label>
         <label>
           {t('shape.width')}
@@ -343,18 +439,101 @@ function ShapeProps({
           />{' '}
           mm
         </label>
+        {isLine && (
+          <>
+            <label>
+              {t('shape.lineStyle')}
+              <select
+                value={dashIdx}
+                onChange={(e) =>
+                  onStyle({ dash: DASHES[+e.currentTarget.value].value })
+                }
+              >
+                {DASHES.map((d, i) => (
+                  <option key={d.key} value={i}>
+                    {t(d.key)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              {t('shape.capStart')}
+              <select
+                value={o.style?.capStart ?? ''}
+                onChange={(e) =>
+                  onStyle({
+                    capStart:
+                      (e.currentTarget.value as EdgeMarker) || undefined,
+                  })
+                }
+              >
+                {CAPS.map((c) => (
+                  <option key={c.key} value={c.value}>
+                    {t(c.key)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              {t('shape.capEnd')}
+              <select
+                value={o.style?.capEnd ?? ''}
+                onChange={(e) =>
+                  onStyle({
+                    capEnd:
+                      (e.currentTarget.value as EdgeMarker) || undefined,
+                  })
+                }
+              >
+                {CAPS.map((c) => (
+                  <option key={c.key} value={c.value}>
+                    {t(c.key)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </>
+        )}
       </div>
       <ZButtons onReorder={onReorder} t={t} />
+      {objs.length === 1 && shapeAnchors(o).length > 0 && (
+        <footer className="hint">{t('shape.gripHint')}</footer>
+      )}
     </div>
   );
 }
 
 function toHex(c: string): string {
   if (/^#[0-9a-fA-F]{6}$/.test(c)) return c;
-  if (/^#[0-9a-fA-F]{3}$/.test(c)) {
-    return '#' + [...c.slice(1)].map((x) => x + x).join('');
+  if (/^#[0-9a-fA-F]{8}$/.test(c)) return c.slice(0, 7);
+  if (/^#[0-9a-fA-F]{3,4}$/.test(c)) {
+    return '#' + [...c.slice(1, 4)].map((x) => x + x).join('');
+  }
+  const m = /^rgba?\((\d+)[,\s]+(\d+)[,\s]+(\d+)/.exec(c);
+  if (m) {
+    return (
+      '#' +
+      [m[1], m[2], m[3]]
+        .map((v) => Number(v).toString(16).padStart(2, '0'))
+        .join('')
+    );
   }
   return '#333333';
+}
+
+/** CSS 色のアルファ (0..1)。#rrggbbaa / #rgba / rgba() を解釈、他は不透明 */
+function alphaOf(c: string): number {
+  if (/^#[0-9a-fA-F]{8}$/.test(c)) return parseInt(c.slice(7), 16) / 255;
+  if (/^#[0-9a-fA-F]{4}$/.test(c)) return parseInt(c[4] + c[4], 16) / 255;
+  const m = /^rgba?\(\s*\d+[,\s]+\d+[,\s]+\d+[\s,/]+([\d.]+)/.exec(c);
+  if (m) return Math.min(1, Math.max(0, +m[1]));
+  return 1;
+}
+
+/** #rrggbb にアルファを乗せて返す。不透明なら6桁のまま */
+function withAlpha(hex6: string, alpha: number): string {
+  const a = Math.round(Math.min(1, Math.max(0, alpha)) * 255);
+  return a >= 255 ? hex6 : hex6 + a.toString(16).padStart(2, '0');
 }
 
 function DocProps({

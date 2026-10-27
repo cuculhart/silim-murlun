@@ -98,7 +98,7 @@ export function MenuPane({
         <span className="m-ic">≡</span>
         {!collapsed && (
           <span className="m-label">
-            Silim Murlun <span className="m-ver">v0.3.0</span>
+            Silim Murlun <span className="m-ver">v0.4.0</span>
           </span>
         )}
       </button>

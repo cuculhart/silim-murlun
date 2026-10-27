@@ -11,7 +11,7 @@ export function createCanvasMeasurer(): TextMeasurer {
   return {
     fit(text, box) {
       const fpx = (box.fontSize ?? 4) * MM_PX;
-      ctx.font = `${fpx}px ${box.fontFamily ?? 'sans-serif'}`;
+      ctx.font = `${box.italic ? 'italic ' : ''}${box.bold ? 'bold ' : ''}${fpx}px ${box.fontFamily ?? 'sans-serif'}`;
       const maxW = box.width * MM_PX;
       const maxLines = Math.max(
         1,

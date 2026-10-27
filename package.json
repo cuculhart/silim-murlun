@@ -1,7 +1,7 @@
 {
   "name": "silim-murlun",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "A graph-paper layout editor for printed documents — true millimeter units, linked text frames, browser-native printing.",
   "type": "module",
   "workspaces": [

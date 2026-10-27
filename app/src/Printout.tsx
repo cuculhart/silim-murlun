@@ -103,6 +103,39 @@ export function Printout({
                   { fx: 0, fy: 0 },
                   { fx: 1, fy: 1 },
                 ];
+                // 0サイズの <svg> は描画自体が無効化されるため下限を設ける。
+                // viewBox を mm 実寸に合わせ、strokeWidth/dash/端子も mm 換算
+                const vw = Math.max(o.w, 0.1);
+                const vh = Math.max(o.h, 0.1);
+                const col = o.style?.stroke ?? '#333';
+                const ms = `pmk-${o.id}-s`;
+                const me = `pmk-${o.id}-e`;
+                const cap = (id: string, kind: string) =>
+                  kind === 'arrow' ? (
+                    <marker
+                      id={id}
+                      markerUnits="userSpaceOnUse"
+                      orient="auto-start-reverse"
+                      markerWidth={2.7}
+                      markerHeight={2.2}
+                      refX={2.4}
+                      refY={1.05}
+                    >
+                      <path d="M 0 0 L 2.6 1.05 L 0 2.1 z" fill={col} />
+                    </marker>
+                  ) : (
+                    <marker
+                      id={id}
+                      markerUnits="userSpaceOnUse"
+                      orient="auto-start-reverse"
+                      markerWidth={2.2}
+                      markerHeight={2.2}
+                      refX={1.05}
+                      refY={1.05}
+                    >
+                      <circle cx={1.05} cy={1.05} r={0.8} fill={col} />
+                    </marker>
+                  );
                 return (
                   <svg
                     key={o.id}
@@ -110,21 +143,31 @@ export function Printout({
                     style={{
                       left: `${left}mm`,
                       top: `${top}mm`,
-                      width: `${o.w}mm`,
-                      height: `${o.h}mm`,
+                      width: `${vw}mm`,
+                      height: `${vh}mm`,
                       overflow: 'visible',
                     }}
-                    viewBox="0 0 1 1"
+                    viewBox={`0 0 ${vw} ${vh}`}
                     preserveAspectRatio="none"
                   >
+                    <defs>
+                      {o.style?.capStart && cap(ms, o.style.capStart)}
+                      {o.style?.capEnd && cap(me, o.style.capEnd)}
+                    </defs>
                     <line
-                      x1={pts[0].fx}
-                      y1={pts[0].fy}
-                      x2={pts[1].fx}
-                      y2={pts[1].fy}
-                      stroke={o.style?.stroke ?? '#333'}
+                      x1={pts[0].fx * vw}
+                      y1={pts[0].fy * vh}
+                      x2={pts[1].fx * vw}
+                      y2={pts[1].fy * vh}
+                      stroke={col}
                       strokeWidth={wMm}
-                      vectorEffect="non-scaling-stroke"
+                      strokeDasharray={o.style?.dash
+                        ?.map((v) => v / MM_PX)
+                        .join(' ')}
+                      markerStart={
+                        o.style?.capStart ? `url(#${ms})` : undefined
+                      }
+                      markerEnd={o.style?.capEnd ? `url(#${me})` : undefined}
                     />
                   </svg>
                 );
@@ -144,6 +187,9 @@ export function Printout({
                       fontSize: `${d.fontSize}mm`,
                       lineHeight: LINE_HEIGHT,
                       fontFamily: d.fontFamily,
+                      fontWeight: d.bold ? 'bold' : undefined,
+                      fontStyle: d.italic ? 'italic' : undefined,
+                      textDecoration: d.underline ? 'underline' : undefined,
                     }}
                   >
                     <span style={{ color: d.color }}>{sliceText(o)}</span>

@@ -1,7 +1,7 @@
 {
   "name": "silim-app",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,11 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@kimetron/core": "1.4.0",
-    "@kimetron/dom": "1.4.0",
-    "@kimetron/react": "1.4.0",
+    "@kimetron/core": "1.4.1",
+    "@kimetron/dom": "1.4.1",
+    "@kimetron/react": "1.4.1",
     "fflate": "^0.8.3",
-    "inimbal": "0.1.0",
+    "inimbal": "0.4.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },
