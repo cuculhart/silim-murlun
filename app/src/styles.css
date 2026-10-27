@@ -4,6 +4,7 @@ body,
   margin: 0;
   height: 100%;
   font-family: sans-serif;
+  overflow: hidden; /* 中ボタンオートスクロール/絶対配置要素のはみ出しを抑止 */
 }
 
 /* ── テーマ変数 ──
@@ -173,6 +174,7 @@ body,
   flex: 1;
   min-width: 0;
   background: var(--bg);
+  overflow: hidden; /* ルーラー/ゴースト等のはみ出しをクリップ */
 }
 
 .canvas-wrap .ki-canvas {
@@ -690,6 +692,111 @@ body,
 .sub-props {
   border-top: 1px solid var(--line);
   flex: none;
+}
+
+/* ── ルーラー（アクティブページ枠に沿う帯。位置は JS で指定） ── */
+.ruler-corner {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  background: var(--surface2);
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  z-index: 9;
+}
+
+.ruler {
+  position: absolute;
+  z-index: 8;
+  background: var(--surface2);
+  color: var(--muted);
+  pointer-events: none;
+  overflow: hidden;
+  font-size: 9px;
+}
+
+.ruler-h {
+  height: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.ruler-v {
+  width: 18px;
+  border-right: 1px solid var(--line);
+}
+
+.ruler .rt {
+  position: absolute;
+  border-color: var(--line);
+}
+
+.ruler-h .rt {
+  top: 8px;
+  bottom: 0;
+  border-left: 1px solid var(--line);
+}
+
+.ruler-h .rt.major {
+  top: 0;
+}
+
+.ruler-h .rt span {
+  position: absolute;
+  top: 0;
+  left: 3px;
+  white-space: nowrap;
+}
+
+.ruler-v .rt {
+  left: 8px;
+  right: 0;
+  border-top: 1px solid var(--line);
+}
+
+.ruler-v .rt.major {
+  left: 0;
+}
+
+.ruler-v .rt span {
+  position: absolute;
+  top: 2px;
+  left: 0;
+  writing-mode: vertical-rl;
+  font-size: 8px;
+}
+
+.ruler .rcur {
+  position: absolute;
+  background: var(--sel);
+}
+
+.ruler-h .rcur {
+  top: 0;
+  bottom: 0;
+  width: 1px;
+}
+
+.ruler-v .rcur {
+  left: 0;
+  right: 0;
+  height: 1px;
+}
+
+/* ── プロパティ小部品 ── */
+.ins-btn {
+  margin: 4px 10px;
+  padding: 4px 8px;
+  font-size: 12px;
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.ins-btn:hover {
+  background: var(--bg);
 }
 
 /* ── ステータスバー ── */

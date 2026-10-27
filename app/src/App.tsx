@@ -26,6 +26,7 @@ import { LinkWires, type LinkSel } from './LinkWires';
 import { MenuPane, type ShapeTool, type Theme } from './MenuPane';
 import { PageNav } from './PageNav';
 import { Printout } from './Printout';
+import { Rulers } from './Rulers';
 import { packArchive, unpackArchive } from './docio';
 import { createCanvasMeasurer } from './measure';
 import {
@@ -111,7 +112,11 @@ export function App() {
     lock: boolean;
   } | null>(null);
   const [ghost, setGhost] = useState<{ x: number; y: number } | null>(null);
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
+  const [ctxMenu, setCtxMenu] = useState<{
+    x: number;
+    y: number;
+    wire?: LinkSel;
+  } | null>(null);
   const [printing, setPrinting] = useState(false);
   const [theme, setTheme] = useState<Theme>(
     () => (localStorage.getItem('silim-theme') as Theme) || 'standard',
@@ -127,6 +132,26 @@ export function App() {
     x1: number;
     y1: number;
   } | null>(null);
+  const [docTitle, setDocTitle] = useState('');
+  const [saveDlg, setSaveDlg] = useState<string | null>(null);
+  const [rulerOn, setRulerOn] = useState(true);
+  const [histTick, setHistTick] = useState(0);
+  const createdAtRef = useRef(new Date().toISOString());
+  const dirtyRef = useRef(false);
+  const applyingRef = useRef(false);
+  type Snap = {
+    objects: WorldObject[];
+    chains: Chain[];
+    model: PageModel;
+    footer: boolean;
+    title: string;
+  };
+  const histRef = useRef<{ past: Snap[]; future: Snap[]; last: number }>({
+    past: [],
+    future: [],
+    last: 0,
+  });
+  const snapRef = useRef<Snap | null>(null);
 
   const seqRef = useRef(1);
   /** 既存オブジェクト・連鎖と衝突しない id を採番する
@@ -211,6 +236,22 @@ export function App() {
     const onKey = (e: KeyboardEvent) => {
       const t = document.activeElement as HTMLElement | null;
       if (t && ['TEXTAREA', 'INPUT', 'SELECT'].includes(t.tagName)) return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        setSaveDlg(docTitle || 'document');
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        redo();
+        return;
+      }
       if (e.key === 'Escape') {
         setLinkMode(false);
         setLinkFrom(null);
@@ -235,7 +276,8 @@ export function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [engine, selLink]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [engine, selLink, docTitle]);
 
   // ── Ctrl+P / ブラウザの印刷メニューでも印刷用 DOM を組み立てる ──
   useEffect(() => {
@@ -282,20 +324,94 @@ export function App() {
   const contentObjects = () =>
     engine.doc.objects.filter((o) => o.kind !== PAGE_KIND);
 
+  // ── Undo/Redo（doc＋連鎖＋ページ＋設定の統合スナップショット） ──
+  const makeSnap = (): Snap => ({
+    objects: contentObjects(),
+    chains,
+    model,
+    footer,
+    title: docTitle,
+  });
+  const applySnap = (s: Snap) => {
+    applyingRef.current = true;
+    setModel(s.model);
+    engine.setDoc({
+      ...engine.doc,
+      objects: [...pageObjects(s.model), ...s.objects],
+    });
+    syncSnapExtra(engine, s.model);
+    setChains(s.chains);
+    setFooter(s.footer);
+    setDocTitle(s.title);
+    snapRef.current = s;
+    applyingRef.current = false;
+  };
+  const undo = () => {
+    const h = histRef.current;
+    const s = h.past.pop();
+    if (!s || !snapRef.current) return;
+    h.future.push(snapRef.current);
+    applySnap(s);
+    setHistTick((t) => t + 1);
+  };
+  const redo = () => {
+    const h = histRef.current;
+    const s = h.future.pop();
+    if (!s || !snapRef.current) return;
+    h.past.push(snapRef.current);
+    applySnap(s);
+    setHistTick((t) => t + 1);
+  };
+
+  // 変更検知 → 500ms の連続編集を1エントリに畳んで履歴へ
+  useEffect(() => {
+    if (!snapRef.current) {
+      snapRef.current = makeSnap();
+      return;
+    }
+    dirtyRef.current = true;
+    if (applyingRef.current) return;
+    const now = Date.now();
+    if (now - histRef.current.last > 500) {
+      const h = histRef.current;
+      h.past.push(snapRef.current);
+      if (h.past.length > 100) h.past.shift();
+      h.future = [];
+      h.last = now;
+      setHistTick((t) => t + 1);
+    }
+    snapRef.current = makeSnap();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [engine.doc.objects, chains, model, footer, docTitle]);
+
+  // 未保存変更があるときの離脱警告
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (dirtyRef.current) e.preventDefault();
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, []);
+
   const newDoc = () => {
     if (!window.confirm('新規作成します。現在の内容は破棄されます。')) return;
     commitPages(createPages({ size: 'A4', landscape: false }, 1), []);
     setChains([]);
     setFooter(true);
+    setDocTitle('');
+    createdAtRef.current = new Date().toISOString();
+    dirtyRef.current = false;
     engine.setSelection([]);
   };
-  const saveDoc = () => {
+  const confirmSave = (name: string) => {
     const u8 = packArchive({
       spec: model.spec,
       pages: model.pages,
       objects: contentObjects(),
       chains,
       footer,
+      title: docTitle,
+      createdAt: createdAtRef.current,
     });
     const a = document.createElement('a');
     const url = URL.createObjectURL(
@@ -304,9 +420,11 @@ export function App() {
       }),
     );
     a.href = url;
-    a.download = 'document.slm';
+    a.download = name.endsWith('.slm') ? name : `${name}.slm`;
     a.click();
     URL.revokeObjectURL(url);
+    dirtyRef.current = false;
+    setSaveDlg(null);
   };
   const onOpenFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.currentTarget.files?.[0];
@@ -318,6 +436,9 @@ export function App() {
         commitPages(r.model, r.objects);
         setChains(r.chains);
         setFooter(r.footer);
+        setDocTitle(r.title);
+        createdAtRef.current = r.createdAt || new Date().toISOString();
+        dirtyRef.current = false;
         engine.setSelection([]);
       })
       .catch((err: Error) => flash(`開けません: ${err.message}`));
@@ -637,7 +758,13 @@ export function App() {
           onToggle={() => setCollapsed((v) => !v)}
           onNew={newDoc}
           onOpen={() => openFileRef.current?.click()}
-          onSave={saveDoc}
+          onSave={() => setSaveDlg(docTitle || 'document')}
+          onUndo={undo}
+          onRedo={redo}
+          canUndo={histRef.current.past.length > 0}
+          canRedo={histRef.current.future.length > 0}
+          rulerOn={rulerOn}
+          onRuler={() => setRulerOn((v) => !v)}
           linkMode={linkMode}
           onLinkMode={() => {
             setLinkMode((m) => !m);
@@ -657,6 +784,11 @@ export function App() {
           className={linkMode ? 'canvas-wrap link-mode' : 'canvas-wrap'}
           onClick={onCanvasClick}
           onDoubleClick={onDblClick}
+          onPointerDown={(e) => {
+            // 中ボタンドラッグの既定動作（オートスクロール）を抑止し、
+            // kimetron のパン操作だけにする
+            if (e.button === 1) e.preventDefault();
+          }}
           onPointerMove={(e) => {
             if (!placingRef.current) return;
             const r = canvasRef.current!.getBoundingClientRect();
@@ -670,11 +802,42 @@ export function App() {
               y: Math.round(w.y / gs) * gs,
             });
           }}
+          onPointerUp={() => {
+            // アスペクト比ロック画像 → リサイズ確定時に補正
+            let fix = false;
+            const objects = engine.doc.objects.map((o) => {
+              if (
+                o.kind === IMG_KIND &&
+                engine.selectedIds.has(o.id) &&
+                (o.data as ImageData).lock
+              ) {
+                const d = o.data as ImageData;
+                const h = o.w * d.aspect;
+                if (Math.abs(o.h - h) > 0.05) {
+                  fix = true;
+                  return { ...o, h };
+                }
+              }
+              return o;
+            });
+            if (fix) engine.setDoc({ ...engine.doc, objects });
+          }}
           onContextMenu={(e) => {
             e.preventDefault();
             if (placingRef.current) {
               setPlacing(null);
               setGhost(null);
+              return;
+            }
+            // ワイヤー右クリック → 切断メニュー
+            const g = (e.target as Element).closest?.(
+              'g[data-link]',
+            ) as SVGGElement | null;
+            if (g?.dataset.link) {
+              const [chainId, idx] = g.dataset.link.split(':');
+              const wire = { chainId, index: +idx };
+              setSelLink(wire);
+              setCtxMenu({ x: e.clientX, y: e.clientY, wire });
               return;
             }
             const objEl = (e.target as HTMLElement).closest?.(
@@ -812,6 +975,13 @@ export function App() {
               }}
             />
           )}
+          {rulerOn && rects[curPage] && (
+            <Rulers
+              engine={engine}
+              page={rects[curPage]}
+              cursor={engine.cursorWorld}
+            />
+          )}
           <PageNav
             current={curPage}
             total={rects.length}
@@ -859,7 +1029,39 @@ export function App() {
           }
           onReorder={(op) => engine.reorderSelected(op)}
           onDeselect={() => engine.setSelection([])}
+          onAddArea={() => {
+            if (!selObj || !selChain) return;
+            const id = nextId('ta');
+            const i = selChain.areas.indexOf(selObj.id);
+            engine.addObject({
+              id,
+              kind: TEXT_KIND,
+              x: selObj.x,
+              y: selObj.y + selObj.h + 5,
+              w: selObj.w,
+              h: selObj.h,
+              style: selObj.style ? { ...selObj.style } : undefined,
+              data: selObj.data ? { ...selObj.data } : { ...DEFAULT_TEXT_DATA },
+            });
+            setChains((cs) =>
+              cs.map((c) =>
+                c.id === selChain.id
+                  ? {
+                      ...c,
+                      areas: [
+                        ...c.areas.slice(0, i + 1),
+                        id,
+                        ...c.areas.slice(i + 1),
+                      ],
+                    }
+                  : c,
+              ),
+            );
+            engine.setSelection([id]);
+          }}
           docProps={{
+            title: docTitle,
+            onTitle: setDocTitle,
             size: spec.size,
             landscape: spec.landscape,
             pageCount: model.pages.length,
@@ -984,6 +1186,20 @@ export function App() {
             className="ctx-menu"
             style={{ left: ctxMenu.x, top: ctxMenu.y }}
           >
+            {ctxMenu.wire ? (
+              <button
+                onClick={() => {
+                  setChains((cs) =>
+                    unlinkAt(cs, ctxMenu.wire!.chainId, ctxMenu.wire!.index, nextId('c')),
+                  );
+                  setSelLink(null);
+                  setCtxMenu(null);
+                }}
+              >
+                切断
+              </button>
+            ) : (
+              <>
             <button
               onClick={() => {
                 engine.reorderSelected('front');
@@ -1016,6 +1232,36 @@ export function App() {
             >
               最背面へ
             </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 名前を付けて保存ダイアログ */}
+      {saveDlg !== null && (
+        <div className="dlg-backdrop">
+          <div className="dlg">
+            <div className="row">
+              <label>
+                ファイル名{' '}
+                <input
+                  type="text"
+                  value={saveDlg}
+                  style={{ width: '180px' }}
+                  autoFocus
+                  onChange={(e) => setSaveDlg(e.currentTarget.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') confirmSave(saveDlg);
+                  }}
+                />
+                .slm
+              </label>
+            </div>
+            <div className="btns">
+              <button onClick={() => confirmSave(saveDlg)}>保存</button>
+              <button onClick={() => setSaveDlg(null)}>キャンセル</button>
+            </div>
           </div>
         </div>
       )}

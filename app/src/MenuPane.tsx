@@ -18,6 +18,12 @@ export function MenuPane({
   onNew,
   onOpen,
   onSave,
+  onUndo,
+  onRedo,
+  canUndo,
+  canRedo,
+  rulerOn,
+  onRuler,
   linkMode,
   onLinkMode,
   shapeTool,
@@ -34,6 +40,12 @@ export function MenuPane({
   onNew: () => void;
   onOpen: () => void;
   onSave: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  rulerOn: boolean;
+  onRuler: () => void;
   linkMode: boolean;
   onLinkMode: () => void;
   shapeTool: ShapeTool | null;
@@ -75,13 +87,19 @@ export function MenuPane({
         <span className="m-ic">≡</span>
         {!collapsed && (
           <span className="m-label">
-            Silim Murlun <span className="m-ver">v0.1.0</span>
+            Silim Murlun <span className="m-ver">v0.2.0</span>
           </span>
         )}
       </button>
       {item('新', '新規', onNew)}
       {item('開', '開く…', onOpen)}
-      {item('存', '保存', onSave, { title: '書庫 (.slm) で保存' })}
+      {item('存', '名前を付けて保存', onSave, {
+        title: '書庫 (.slm) として保存（Ctrl+S）',
+      })}
+      <div className="m-sep" />
+      {canUndo && item('消', '取り消し', onUndo, { title: 'Ctrl+Z' })}
+      {canRedo && item('戻', 'やり直し', onRedo, { title: 'Ctrl+Y' })}
+      {item('尺', 'ルーラー', onRuler, { on: rulerOn })}
       <div className="m-sep" />
       {item('鎖', 'リンクモード', onLinkMode, {
         on: linkMode,

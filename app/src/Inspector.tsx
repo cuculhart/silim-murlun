@@ -90,6 +90,7 @@ export function RightDock({
   onStyle,
   onReorder,
   onDeselect,
+  onAddArea,
   docProps,
 }: {
   selObjs: WorldObject[];
@@ -105,7 +106,11 @@ export function RightDock({
   onStyle: (patch: { fill?: string; stroke?: string; width?: number }) => void;
   onReorder: (op: ZOrder) => void;
   onDeselect: () => void;
+  /** 選択エリアの直後に連鎖エリアを追加 */
+  onAddArea: () => void;
   docProps: {
+    title: string;
+    onTitle: (t: string) => void;
     size: 'A4' | 'A3';
     landscape: boolean;
     pageCount: number;
@@ -135,6 +140,9 @@ export function RightDock({
         />
         <div className="sub-props">
           <MmFields obj={one} onRect={onRect} />
+          <button className="ins-btn" onClick={onAddArea}>
+            このエリアの後に連鎖エリアを追加
+          </button>
           <ZButtons onReorder={onReorder} />
         </div>
       </>
@@ -315,6 +323,8 @@ function toHex(c: string): string {
 }
 
 function DocProps({
+  title,
+  onTitle,
   size,
   landscape,
   pageCount,
@@ -325,6 +335,8 @@ function DocProps({
   onInsertAfter,
   onFooter,
 }: {
+  title: string;
+  onTitle: (t: string) => void;
   size: 'A4' | 'A3';
   landscape: boolean;
   pageCount: number;
@@ -342,6 +354,15 @@ function DocProps({
         <span>文書</span>
       </header>
       <div className="doc-props-grid">
+        <label>
+          タイトル
+          <input
+            type="text"
+            value={title}
+            placeholder="（無題）"
+            onChange={(e) => onTitle(e.currentTarget.value)}
+          />
+        </label>
         <label>
           用紙
           <select

@@ -42,7 +42,7 @@ export function LinkWires({
       const d = `M${p1.x},${p1.y} C${mx},${p1.y} ${mx},${p2.y} ${p2.x},${p2.y}`;
       const sel = selLink?.chainId === c.id && selLink.index === i;
       paths.push(
-        <g key={`${c.id}:${i}`}>
+        <g key={`${c.id}:${i}`} data-link={`${c.id}:${i}`}>
           <path
             className="wire-hit"
             d={d}

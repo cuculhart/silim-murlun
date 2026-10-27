@@ -12,6 +12,9 @@ export const ARCHIVE_EXT = '.slm';
 
 interface ArchiveDoc {
   format: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
   paper: PageModel['spec'];
   pages: PageModel['pages'];
   objects: WorldObject[];
@@ -57,6 +60,8 @@ export function packArchive(input: {
   objects: WorldObject[];
   chains: Chain[];
   footer: boolean;
+  title: string;
+  createdAt: string;
 }): Uint8Array {
   const files: Record<string, Uint8Array> = {};
   let imgN = 0;
@@ -71,6 +76,9 @@ export function packArchive(input: {
   });
   const doc: ArchiveDoc = {
     format: ARCHIVE_FORMAT,
+    title: input.title,
+    createdAt: input.createdAt,
+    updatedAt: new Date().toISOString(),
     paper: input.spec,
     pages: input.pages,
     objects,
@@ -87,6 +95,8 @@ export function unpackArchive(bytes: Uint8Array): {
   objects: WorldObject[];
   chains: Chain[];
   footer: boolean;
+  title: string;
+  createdAt: string;
 } {
   const files = unzipSync(bytes);
   const raw = files['doc.json'];
@@ -112,5 +122,7 @@ export function unpackArchive(bytes: Uint8Array): {
     objects,
     chains: doc.chains ?? [],
     footer: doc.footer !== false,
+    title: doc.title ?? '',
+    createdAt: doc.createdAt ?? '',
   };
 }
