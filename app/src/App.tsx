@@ -27,6 +27,7 @@ import { MenuPane, type ShapeTool, type Theme } from './MenuPane';
 import { PageNav } from './PageNav';
 import { Printout } from './Printout';
 import { Rulers } from './Rulers';
+import { makeT, tf, type Lang } from './i18n';
 import { packArchive, unpackArchive } from './docio';
 import { createCanvasMeasurer } from './measure';
 import {
@@ -45,7 +46,7 @@ import './styles.css';
 
 /** ページ枠を kimetron オブジェクトとして展開する。
     locked + layer -1 で最背面・操作対象外（hitFilter でも除外）。 */
-function pageObjects(model: PageModel): WorldObject[] {
+function pageObjects(model: PageModel, opacity = 1): WorldObject[] {
   return pageRects(model.spec, model.pages).map((r) => ({
     id: r.id,
     kind: PAGE_KIND,
@@ -55,7 +56,7 @@ function pageObjects(model: PageModel): WorldObject[] {
     h: r.h,
     locked: true,
     layer: -1,
-    style: { fill: '#ffffff' },
+    style: { fill: `rgba(255,255,255,${opacity})` },
     data: { index: r.index },
   }));
 }
@@ -70,12 +71,6 @@ function syncSnapExtra(engine: Engine, model: PageModel): void {
   }
   engine.snapExtra = { xs, ys };
 }
-
-const DEMO_TEXT =
-  'ここはテキストエリアです。長い文章を入れるとエリアの高さからあふれ、' +
-  'リンクした次のエリアへ流れ込みます。改行もそのまま流れます。\n' +
-  'リンクモードで別のエリアへ接続すると、文字がページをまたいで流れます。' +
-  '線をクリックして Del を押すと切断して巻き戻ります。';
 
 /** 画像取り込みダイアログの状態 */
 interface ImgDlg {
@@ -122,6 +117,12 @@ export function App() {
     () => (localStorage.getItem('silim-theme') as Theme) || 'standard',
   );
   const [collapsed, setCollapsed] = useState(false);
+  const [dockCollapsed, setDockCollapsed] = useState(false);
+  const [lang, setLang] = useState<Lang>(
+    () => (localStorage.getItem('silim-lang') as Lang) || 'ja',
+  );
+  const t = makeT(lang);
+  const [pageOpacity, setPageOpacity] = useState(100);
   const [footer, setFooter] = useState(true);
   const [navCollapsed, setNavCollapsed] = useState(false);
   const [activePage, setActivePage] = useState(0);
@@ -145,6 +146,7 @@ export function App() {
     model: PageModel;
     footer: boolean;
     title: string;
+    pageOpacity: number;
   };
   const histRef = useRef<{ past: Snap[]; future: Snap[]; last: number }>({
     past: [],
@@ -187,30 +189,12 @@ export function App() {
     engine.hitFilter = (o) => o.kind !== PAGE_KIND && !linkModeRef.current;
     engine.marqueeFilter = (o) =>
       o.kind !== PAGE_KIND && !linkModeRef.current;
-    const ta = (id: string, x: number, y: number): WorldObject => ({
-      id,
-      kind: TEXT_KIND,
-      x,
-      y,
-      w: 80,
-      h: 50,
-      style: {
-        fill: 'rgba(255,255,255,0.55)',
-        stroke: 'rgba(90,110,140,0.4)',
-      },
-      data: { ...DEFAULT_TEXT_DATA },
-    });
     engine.setDoc({
       ...engine.doc,
-      objects: [
-        ...pageObjects(model),
-        ta('ta1', 30, 30),
-        ta('ta2', 30, 20 + (297 + 12) + 10),
-      ],
+      objects: pageObjects(model),
     });
     syncSnapExtra(engine, model);
-    setChains([{ id: 'c0', areas: ['ta1', 'ta2'], text: DEMO_TEXT }]);
-    engine.setSelection(['ta1']);
+    focusPage(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine]);
 
@@ -293,7 +277,7 @@ export function App() {
       objects ?? engine.doc.objects.filter((o) => o.kind !== PAGE_KIND);
     engine.setDoc({
       ...engine.doc,
-      objects: [...pageObjects(next), ...content],
+      objects: [...pageObjects(next, pageOpacity / 100), ...content],
     });
     syncSnapExtra(engine, next);
   };
@@ -331,18 +315,23 @@ export function App() {
     model,
     footer,
     title: docTitle,
+    pageOpacity,
   });
   const applySnap = (s: Snap) => {
     applyingRef.current = true;
     setModel(s.model);
     engine.setDoc({
       ...engine.doc,
-      objects: [...pageObjects(s.model), ...s.objects],
+      objects: [
+        ...pageObjects(s.model, s.pageOpacity / 100),
+        ...s.objects,
+      ],
     });
     syncSnapExtra(engine, s.model);
     setChains(s.chains);
     setFooter(s.footer);
     setDocTitle(s.title);
+    setPageOpacity(s.pageOpacity);
     snapRef.current = s;
     applyingRef.current = false;
   };
@@ -382,7 +371,7 @@ export function App() {
     }
     snapRef.current = makeSnap();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engine.doc.objects, chains, model, footer, docTitle]);
+  }, [engine.doc.objects, chains, model, footer, docTitle, pageOpacity]);
 
   // 未保存変更があるときの離脱警告
   useEffect(() => {
@@ -393,15 +382,37 @@ export function App() {
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, []);
 
+  // G3: 用紙の透過 → ページ枠オブジェクトの fill を即時反映
+  useEffect(() => {
+    engine.setDoc({
+      ...engine.doc,
+      objects: engine.doc.objects.map((o) =>
+        o.kind === PAGE_KIND
+          ? {
+              ...o,
+              style: {
+                ...(o.style ?? {}),
+                fill: `rgba(255,255,255,${pageOpacity / 100})`,
+              },
+            }
+          : o,
+      ),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageOpacity]);
+
   const newDoc = () => {
-    if (!window.confirm('新規作成します。現在の内容は破棄されます。')) return;
-    commitPages(createPages({ size: 'A4', landscape: false }, 1), []);
+    if (!window.confirm(t('confirm.new'))) return;
+    const m = createPages({ size: 'A4', landscape: false }, 1);
+    commitPages(m, []);
     setChains([]);
     setFooter(true);
     setDocTitle('');
+    setPageOpacity(100);
     createdAtRef.current = new Date().toISOString();
     dirtyRef.current = false;
     engine.setSelection([]);
+    focusPage(0, m);
   };
   const confirmSave = (name: string) => {
     const u8 = packArchive({
@@ -412,6 +423,7 @@ export function App() {
       footer,
       title: docTitle,
       createdAt: createdAtRef.current,
+      pageOpacity,
     });
     const a = document.createElement('a');
     const url = URL.createObjectURL(
@@ -437,11 +449,13 @@ export function App() {
         setChains(r.chains);
         setFooter(r.footer);
         setDocTitle(r.title);
+        setPageOpacity(r.pageOpacity);
         createdAtRef.current = r.createdAt || new Date().toISOString();
         dirtyRef.current = false;
         engine.setSelection([]);
+        focusPage(0, r.model);
       })
-      .catch((err: Error) => flash(`開けません: ${err.message}`));
+      .catch((err: Error) => flash(tf(t, 'hint.cantOpen', err.message)));
   };
 
   // ── テキストエリア生成（用紙上ダブルクリック） ──
@@ -465,7 +479,7 @@ export function App() {
       (p) => w.x >= p.x && w.x < p.x + p.w && w.y >= p.y && w.y < p.y + p.h,
     );
     if (!onPaper) {
-      flash('用紙の上をダブルクリックでテキストエリア');
+      flash(t('hint.onPaper'));
       return;
     }
     const gs = engine.doc.grid.size || 5;
@@ -497,7 +511,7 @@ export function App() {
     if (!c) return;
     if (!linkFrom) {
       if (c.areas[c.areas.length - 1] !== areaId) {
-        flash('接続の起点は連鎖の末尾エリアです');
+        flash(t('hint.linkFrom'));
         return;
       }
       setLinkFrom(areaId);
@@ -512,7 +526,7 @@ export function App() {
       setLinkFrom(null);
       setLinkMode(false);
     } else {
-      flash('接続先は別連鎖の先頭エリアです');
+      flash(t('hint.linkTo'));
       if (c.areas[c.areas.length - 1] === areaId) setLinkFrom(areaId);
     }
   };
@@ -645,21 +659,34 @@ export function App() {
   // ── ページナビ: アクティブページ（枠クリック or ナビで切替） ──
   const rects = pageRects(model.spec, model.pages);
   const curPage = Math.min(activePage, Math.max(0, rects.length - 1));
-  const goToPage = (i: number) => {
+  // G1+G2: ページ全体が収まる倍率に調整し、ページ左上（ルーラー原点）を
+  // キャンバス左上（ルーラー帯分の余白込み）に合わせる
+  const focusPage = (i: number, mdl: PageModel = model) => {
     setActivePage(i);
     const el = canvasRef.current;
-    const p = rects[i];
+    const p = pageRects(mdl.spec, mdl.pages)[i];
     if (!el || !p) return;
-    const pxPerMm =
-      engine.worldToScreen({ x: 1, y: 0 }).x -
-      engine.worldToScreen({ x: 0, y: 0 }).x;
+    const pad = 30; // ルーラー帯 + 余白(px)
+    const zoom = Math.min(
+      4,
+      Math.max(
+        0.1,
+        Math.min(
+          (el.clientWidth - pad * 2) / (p.w * MM_PX),
+          (el.clientHeight - pad * 2) / (p.h * MM_PX),
+        ),
+      ),
+    );
+    const u = MM_PX * zoom;
     engine.viewport = {
       ...engine.viewport,
-      x: el.clientWidth / 2 - (p.x + p.w / 2) * pxPerMm,
-      y: el.clientHeight / 2 - (p.y + p.h / 2) * pxPerMm,
+      zoom,
+      x: pad - p.x * u,
+      y: pad - p.y * u,
     };
     engine.panBy(0, 0); // viewport 反映のため emit を起こす
   };
+  const goToPage = (i: number) => focusPage(i);
 
   const { spec } = model;
   const z = engine.viewport.zoom;
@@ -675,16 +702,17 @@ export function App() {
         >
           <span>
             p.{d.index + 1} — {spec.size}
-            {spec.landscape ? '横' : '縦'} {Math.round(o.w)}×{Math.round(o.h)}
+            {t(spec.landscape ? 'page.landscape' : 'page.portrait')}{' '}
+            {Math.round(o.w)}×{Math.round(o.h)}
             mm
           </span>
           <button
-            title="このページの次に挿入"
+            title={t('page.insertAfter')}
             onClick={() => insertBelow(d.index)}
           >
             ＋
           </button>
-          <button title="このページを削除" onClick={() => removePage(o.id)}>
+          <button title={t('page.delete')} onClick={() => removePage(o.id)}>
             ×
           </button>
         </div>
@@ -712,14 +740,18 @@ export function App() {
           {overflow.length > 0 && (
             <div
               className="oflabel nodrag"
-              title="あふれ — クリックで連鎖テキストを開く"
+              title={t('ta.overflowTip')}
               onClick={(e) => {
                 e.stopPropagation();
                 engine.setSelection([o.id]);
               }}
             >
-              あふれ {overflow.length}字 「
-              {overflow.replace(/\n/g, '⏎').slice(0, 14)}…」
+              {tf(
+                t,
+                'ta.overflow',
+                overflow.length,
+                overflow.replace(/\n/g, '⏎').slice(0, 14),
+              )}
             </div>
           )}
         </div>
@@ -765,6 +797,7 @@ export function App() {
           canRedo={histRef.current.future.length > 0}
           rulerOn={rulerOn}
           onRuler={() => setRulerOn((v) => !v)}
+          onFit={() => focusPage(curPage)}
           linkMode={linkMode}
           onLinkMode={() => {
             setLinkMode((m) => !m);
@@ -778,6 +811,13 @@ export function App() {
           onPrint={() => setPrinting(true)}
           theme={theme}
           onTheme={onTheme}
+          onLang={() => {
+            const next = lang === 'ja' ? 'en' : 'ja';
+            setLang(next);
+            localStorage.setItem('silim-lang', next);
+          }}
+          lang={lang}
+          t={t}
         />
         <div
           ref={canvasRef}
@@ -988,6 +1028,7 @@ export function App() {
             collapsed={navCollapsed}
             onToggle={() => setNavCollapsed((v) => !v)}
             onGo={goToPage}
+            t={t}
           />
           {placing && ghost && (
             <div
@@ -1029,6 +1070,8 @@ export function App() {
           }
           onReorder={(op) => engine.reorderSelected(op)}
           onDeselect={() => engine.setSelection([])}
+          collapsed={dockCollapsed}
+          onToggleDock={() => setDockCollapsed((v) => !v)}
           onAddArea={() => {
             if (!selObj || !selChain) return;
             const id = nextId('ta');
@@ -1071,16 +1114,16 @@ export function App() {
             onAddPage: appendPage,
             onInsertAfter: insertAt,
             onFooter: setFooter,
+            pageOpacity,
+            onOpacity: setPageOpacity,
           }}
+          t={t}
         />
       </div>
       <footer className="status">
-        <span className="hint">
-          {hint ||
-            '用紙上ダブルクリック=エリア / 線選択→Del=切断 / 右クリック=Z-order'}
-        </span>
+        <span className="hint">{hint || t('hint.default')}</span>
         <span className="sep" />
-        <span>{model.pages.length}ページ</span>
+        <span>{tf(t, 'status.pages', model.pages.length)}</span>
         <span>scale {engine.scaleText()}</span>
         <span>
           ({formatLength(engine.cursorWorld.x, 'mm')},{' '}
@@ -1102,6 +1145,7 @@ export function App() {
           }}
           onPrint={() => window.print()}
           onClose={() => setPrinting(false)}
+          t={t}
         />
       )}
 
@@ -1125,14 +1169,14 @@ export function App() {
           <div className="dlg">
             <img className="img-prev" src={imgDlg.url} alt="preview" />
             <div className="row">
-              幅{' '}
+              {t('dlg.w')}{' '}
               <input
                 type="number"
                 step="0.1"
                 value={imgDlg.w}
                 onChange={(e) => dlgPatch({ w: +e.currentTarget.value })}
               />{' '}
-              mm 高さ{' '}
+              mm {t('dlg.h')}{' '}
               <input
                 type="number"
                 step="0.1"
@@ -1148,7 +1192,7 @@ export function App() {
                   checked={imgDlg.lock}
                   onChange={(e) => dlgPatch({ lock: e.currentTarget.checked })}
                 />
-                アスペクト比をロック
+                {t('img.lock')}
               </label>
             </div>
             <div className="btns">
@@ -1164,9 +1208,9 @@ export function App() {
                   setImgDlg(null);
                 }}
               >
-                配置
+                {t('dlg.place')}
               </button>
-              <button onClick={() => setImgDlg(null)}>キャンセル</button>
+              <button onClick={() => setImgDlg(null)}>{t('dlg.cancel')}</button>
             </div>
           </div>
         </div>
@@ -1196,7 +1240,7 @@ export function App() {
                   setCtxMenu(null);
                 }}
               >
-                切断
+                {t('ctx.unlink')}
               </button>
             ) : (
               <>
@@ -1206,7 +1250,7 @@ export function App() {
                 setCtxMenu(null);
               }}
             >
-              最前面へ
+              {t('z.front')}
             </button>
             <button
               onClick={() => {
@@ -1214,7 +1258,7 @@ export function App() {
                 setCtxMenu(null);
               }}
             >
-              一つ上へ
+              {t('z.forward')}
             </button>
             <button
               onClick={() => {
@@ -1222,7 +1266,7 @@ export function App() {
                 setCtxMenu(null);
               }}
             >
-              一つ下へ
+              {t('z.backward')}
             </button>
             <button
               onClick={() => {
@@ -1230,7 +1274,7 @@ export function App() {
                 setCtxMenu(null);
               }}
             >
-              最背面へ
+              {t('z.back')}
             </button>
               </>
             )}
@@ -1244,7 +1288,7 @@ export function App() {
           <div className="dlg">
             <div className="row">
               <label>
-                ファイル名{' '}
+                {t('dlg.filename')}{' '}
                 <input
                   type="text"
                   value={saveDlg}
@@ -1259,8 +1303,10 @@ export function App() {
               </label>
             </div>
             <div className="btns">
-              <button onClick={() => confirmSave(saveDlg)}>保存</button>
-              <button onClick={() => setSaveDlg(null)}>キャンセル</button>
+              <button onClick={() => confirmSave(saveDlg)}>
+                {t('dlg.save')}
+              </button>
+              <button onClick={() => setSaveDlg(null)}>{t('dlg.cancel')}</button>
             </div>
           </div>
         </div>

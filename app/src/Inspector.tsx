@@ -1,18 +1,14 @@
-// 右ペイン（選択駆動・F12）— 選択種別ごとに表示を切り替える:
-//   テキストエリア単一 → 連鎖テキスト＋位置サイズmm＋Z-order
-//   テキストエリア複数 → フォント系一括変更のみ
-//   画像単一           → 位置サイズmm＋アスペクト比ロック＋Z-order
-//   シェイプ（単複）   → 塗り色・線色・線幅
-//   画像含む複数選択   → 一括編集なし
-//   未選択             → 文書（用紙・向き・ページ数・挿入・フッター）
+// 右ペイン（選択駆動・F12）— 選択種別ごとに表示を切り替える。
+// 右方向に折りたたみ可（G4）。
 
 import { useState } from 'react';
 import { isShapeKind, type WorldObject, type ZOrder } from '@kimetron/core';
 import type { Chain } from 'inimbal';
+import type { TFunc } from './i18n';
+import { tf } from './i18n';
 import { ChainPane } from './ChainPane';
 import type { ImageData, TextAreaData } from './types';
 import {
-  DEFAULT_TEXT_DATA,
   FONT_FAMILIES,
   FONT_SIZES_MM,
   IMG_KIND,
@@ -23,19 +19,25 @@ import {
 const isShape = (o: WorldObject) =>
   o.kind === 'rect' || isShapeKind(o.kind);
 
-const ZOPS: { op: ZOrder; label: string }[] = [
-  { op: 'front', label: '最前面へ' },
-  { op: 'forward', label: '一つ上へ' },
-  { op: 'backward', label: '一つ下へ' },
-  { op: 'back', label: '最背面へ' },
+const ZOPS: { op: ZOrder; key: string }[] = [
+  { op: 'front', key: 'z.front' },
+  { op: 'forward', key: 'z.forward' },
+  { op: 'backward', key: 'z.backward' },
+  { op: 'back', key: 'z.back' },
 ];
 
-function ZButtons({ onReorder }: { onReorder: (op: ZOrder) => void }) {
+function ZButtons({
+  onReorder,
+  t,
+}: {
+  onReorder: (op: ZOrder) => void;
+  t: TFunc;
+}) {
   return (
     <div className="z-btns">
       {ZOPS.map((z) => (
         <button key={z.op} onClick={() => onReorder(z.op)}>
-          {z.label}
+          {t(z.key)}
         </button>
       ))}
     </div>
@@ -50,7 +52,7 @@ function MmFields({
   onRect: (r: { x: number; y: number; w: number; h: number }) => void;
 }) {
   const f = (key: 'x' | 'y' | 'w' | 'h', label: string) => (
-    <label>
+    <label key={key}>
       {label}
       <input
         type="number"
@@ -72,8 +74,8 @@ function MmFields({
     <div className="mm-grid">
       {f('x', 'X')}
       {f('y', 'Y')}
-      {f('w', '幅')}
-      {f('h', '高さ')}
+      {f('w', 'W')}
+      {f('h', 'H')}
     </div>
   );
 }
@@ -91,39 +93,45 @@ export function RightDock({
   onReorder,
   onDeselect,
   onAddArea,
+  collapsed,
+  onToggleDock,
   docProps,
+  t,
 }: {
   selObjs: WorldObject[];
   chain: Chain | null;
   chainOverflow: string;
   onChainText: (text: string) => void;
   onAreaData: (patch: Partial<TextAreaData>) => void;
-  /** 選択中の全テキストエリアへフォント一括適用 */
   onAreaDataAll: (patch: Partial<TextAreaData>) => void;
   onRect: (r: { x: number; y: number; w: number; h: number }) => void;
   onImageData: (patch: Partial<ImageData>) => void;
-  /** 選択中オブジェクトの style を一括パッチ */
   onStyle: (patch: { fill?: string; stroke?: string; width?: number }) => void;
   onReorder: (op: ZOrder) => void;
   onDeselect: () => void;
-  /** 選択エリアの直後に連鎖エリアを追加 */
   onAddArea: () => void;
+  collapsed: boolean;
+  onToggleDock: () => void;
   docProps: {
     title: string;
-    onTitle: (t: string) => void;
+    onTitle: (s: string) => void;
     size: 'A4' | 'A3';
     landscape: boolean;
     pageCount: number;
     footer: boolean;
+    pageOpacity: number;
     onSize: (s: 'A4' | 'A3') => void;
     onLandscape: () => void;
     onAddPage: () => void;
     onInsertAfter: (index: number) => void;
     onFooter: (on: boolean) => void;
+    onOpacity: (v: number) => void;
   };
+  t: TFunc;
 }) {
   const one = selObjs.length === 1 ? selObjs[0] : null;
-  const allText = selObjs.length > 0 && selObjs.every((o) => o.kind === TEXT_KIND);
+  const allText =
+    selObjs.length > 0 && selObjs.every((o) => o.kind === TEXT_KIND);
   const shapes = selObjs.filter(isShape);
 
   let body: React.ReactNode;
@@ -137,37 +145,57 @@ export function RightDock({
           onText={onChainText}
           onAreaData={onAreaData}
           onClose={onDeselect}
+          t={t}
         />
         <div className="sub-props">
           <MmFields obj={one} onRect={onRect} />
           <button className="ins-btn" onClick={onAddArea}>
-            このエリアの後に連鎖エリアを追加
+            {t('chain.addArea')}
           </button>
-          <ZButtons onReorder={onReorder} />
+          <ZButtons onReorder={onReorder} t={t} />
         </div>
       </>
     );
   } else if (one?.kind === IMG_KIND) {
-    body = <ImageProps obj={one} onRect={onRect} onData={onImageData} onReorder={onReorder} />;
+    body = (
+      <ImageProps
+        obj={one}
+        onRect={onRect}
+        onData={onImageData}
+        onReorder={onReorder}
+        t={t}
+      />
+    );
   } else if (allText && selObjs.length > 1) {
-    body = <FontBatch onApply={onAreaDataAll} />;
+    body = <FontBatch onApply={onAreaDataAll} t={t} />;
   } else if (shapes.length === selObjs.length && selObjs.length > 0) {
-    body = <ShapeProps objs={selObjs} onStyle={onStyle} onReorder={onReorder} />;
+    body = (
+      <ShapeProps objs={selObjs} onStyle={onStyle} onReorder={onReorder} t={t} />
+    );
   } else if (selObjs.length > 0) {
     body = (
       <div className="doc-props">
         <header>
-          <span>選択（{selObjs.length}）</span>
+          <span>{tf(t, 'sel.mixed', selObjs.length)}</span>
         </header>
-        <div className="doc-props-grid">
-          一括プロパティ編集はありません（画像を含む選択は対象外）
-        </div>
+        <div className="doc-props-grid">{t('sel.mixedHint')}</div>
       </div>
     );
   } else {
-    body = <DocProps {...docProps} />;
+    body = <DocProps {...docProps} t={t} />;
   }
-  return <aside className="right-dock">{body}</aside>;
+  return (
+    <aside className={collapsed ? 'right-dock collapsed' : 'right-dock'}>
+      <button
+        className="dock-toggle"
+        onClick={onToggleDock}
+        title={collapsed ? '‹' : '›'}
+      >
+        {collapsed ? '‹' : '›'}
+      </button>
+      {!collapsed && body}
+    </aside>
+  );
 }
 
 function ImageProps({
@@ -175,19 +203,21 @@ function ImageProps({
   onRect,
   onData,
   onReorder,
+  t,
 }: {
   obj: WorldObject;
   onRect: (r: { x: number; y: number; w: number; h: number }) => void;
   onData: (patch: Partial<ImageData>) => void;
   onReorder: (op: ZOrder) => void;
+  t: TFunc;
 }) {
   const d = obj.data as ImageData;
-  const set = (patch: Partial<{ x: number; y: number; w: number; h: number }>) =>
-    onRect({ x: obj.x, y: obj.y, w: obj.w, h: obj.h, ...patch });
   return (
     <div className="img-props">
       <header>
-        <span>画像 {obj.id}</span>
+        <span>
+          {t('img.title')} {obj.id}
+        </span>
       </header>
       <MmFields obj={obj} onRect={onRect} />
       <label className="img-lock">
@@ -200,26 +230,28 @@ function ImageProps({
             if (lock) onData({ aspect: obj.h / obj.w });
           }}
         />
-        アスペクト比をロック
+        {t('img.lock')}
       </label>
-      <ZButtons onReorder={onReorder} />
+      <ZButtons onReorder={onReorder} t={t} />
     </div>
   );
 }
 
 function FontBatch({
   onApply,
+  t,
 }: {
   onApply: (patch: Partial<TextAreaData>) => void;
+  t: TFunc;
 }) {
   return (
     <div className="doc-props">
       <header>
-        <span>テキストエリア（複数選択）</span>
+        <span>{t('font.batch')}</span>
       </header>
       <div className="doc-props-grid">
         <label>
-          フォント
+          {t('chain.font')}
           <select
             defaultValue=""
             onChange={(e) => onApply({ fontFamily: e.currentTarget.value })}
@@ -232,7 +264,7 @@ function FontBatch({
           </select>
         </label>
         <label>
-          サイズ
+          {t('chain.size')}
           <select
             defaultValue=""
             onChange={(e) => onApply({ fontSize: +e.currentTarget.value })}
@@ -245,7 +277,7 @@ function FontBatch({
           </select>
         </label>
         <label>
-          文字色
+          {t('font.color')}
           <input
             type="color"
             defaultValue="#222222"
@@ -253,7 +285,7 @@ function FontBatch({
           />
         </label>
       </div>
-      <footer className="hint">フォント系のみ一括変更できます</footer>
+      <footer className="hint">{t('font.batchHint')}</footer>
     </div>
   );
 }
@@ -262,10 +294,12 @@ function ShapeProps({
   objs,
   onStyle,
   onReorder,
+  t,
 }: {
   objs: WorldObject[];
   onStyle: (p: { fill?: string; stroke?: string; width?: number }) => void;
   onReorder: (op: ZOrder) => void;
+  t: TFunc;
 }) {
   const o = objs[0];
   const fill = o.style?.fill ?? '#00000000';
@@ -275,12 +309,13 @@ function ShapeProps({
     <div className="doc-props">
       <header>
         <span>
-          シェイプ{objs.length > 1 ? `（${objs.length}選択）` : ` ${o.id}`}
+          {t('shape.title')}
+          {objs.length > 1 ? `(${objs.length})` : ` ${o.id}`}
         </span>
       </header>
       <div className="doc-props-grid">
         <label>
-          塗り色
+          {t('shape.fill')}
           <input
             type="color"
             value={toHex(fill)}
@@ -288,7 +323,7 @@ function ShapeProps({
           />
         </label>
         <label>
-          線色
+          {t('shape.stroke')}
           <input
             type="color"
             value={toHex(stroke)}
@@ -296,7 +331,7 @@ function ShapeProps({
           />
         </label>
         <label>
-          線幅
+          {t('shape.width')}
           <input
             type="number"
             step="0.1"
@@ -309,7 +344,7 @@ function ShapeProps({
           mm
         </label>
       </div>
-      <ZButtons onReorder={onReorder} />
+      <ZButtons onReorder={onReorder} t={t} />
     </div>
   );
 }
@@ -329,42 +364,48 @@ function DocProps({
   landscape,
   pageCount,
   footer,
+  pageOpacity,
   onSize,
   onLandscape,
   onAddPage,
   onInsertAfter,
   onFooter,
+  onOpacity,
+  t,
 }: {
   title: string;
-  onTitle: (t: string) => void;
+  onTitle: (s: string) => void;
   size: 'A4' | 'A3';
   landscape: boolean;
   pageCount: number;
   footer: boolean;
+  pageOpacity: number;
   onSize: (s: 'A4' | 'A3') => void;
   onLandscape: () => void;
   onAddPage: () => void;
   onInsertAfter: (index: number) => void;
   onFooter: (on: boolean) => void;
+  onOpacity: (v: number) => void;
+  t: TFunc;
 }) {
   const [ins, setIns] = useState(1);
   return (
     <div className="doc-props">
       <header>
-        <span>文書</span>
+        <span>{t('doc.title')}</span>
       </header>
       <div className="doc-props-grid">
         <label>
-          タイトル
+          {t('doc.name')}
           <input
             type="text"
             value={title}
-            placeholder="（無題）"
+            placeholder={t('doc.untitled')}
             onChange={(e) => onTitle(e.currentTarget.value)}
           />
         </label>
         <label>
-          用紙
+          {t('doc.paper')}
           <select
             value={size}
             onChange={(e) => onSize(e.currentTarget.value as 'A4' | 'A3')}
@@ -375,10 +416,11 @@ function DocProps({
         </label>
         <label>
           <input type="checkbox" checked={landscape} onChange={onLandscape} />
-          横置き
+          {t('doc.landscape')}
         </label>
         <div>
-          {pageCount}ページ <button onClick={onAddPage}>＋追加</button>
+          {pageCount}
+          {t('doc.pages')} <button onClick={onAddPage}>{t('doc.add')}</button>
         </div>
         <div className="ins-row">
           <input
@@ -388,7 +430,8 @@ function DocProps({
             value={ins}
             onChange={(e) => setIns(+e.currentTarget.value)}
           />{' '}
-          ページの後に <button onClick={() => onInsertAfter(ins)}>挿入</button>
+          {t('doc.insertAfter')}{' '}
+          <button onClick={() => onInsertAfter(ins)}>{t('doc.insert')}</button>
         </div>
         <label>
           <input
@@ -396,12 +439,21 @@ function DocProps({
             checked={footer}
             onChange={(e) => onFooter(e.currentTarget.checked)}
           />
-          フッターにページ番号（n / 全ページ）
+          {t('doc.footer')}
+        </label>
+        <label>
+          {t('doc.opacity')}
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={pageOpacity}
+            onChange={(e) => onOpacity(+e.currentTarget.value)}
+          />{' '}
+          {pageOpacity}%
         </label>
       </div>
-      <footer className="hint">
-        未選択 / 複数選択 — オブジェクトを選ぶとプロパティが出ます
-      </footer>
+      <footer className="hint">{t('doc.hint')}</footer>
     </div>
   );
 }

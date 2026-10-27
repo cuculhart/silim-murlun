@@ -28,6 +28,7 @@ export function Printout({
   sliceText,
   onPrint,
   onClose,
+  t,
 }: {
   model: PageModel;
   footer: boolean;
@@ -36,6 +37,7 @@ export function Printout({
   sliceText: (o: WorldObject) => string;
   onPrint: () => void;
   onClose: () => void;
+  t: (key: string) => string;
 }) {
   const rects = pageRects(model.spec, model.pages);
   const { spec } = model;
@@ -45,8 +47,8 @@ export function Printout({
     <div className="printout">
       <style>{`@page { size: ${spec.size} ${spec.landscape ? 'landscape' : 'portrait'}; margin: 0; }`}</style>
       <div className="pbar">
-        <button onClick={onPrint}>印刷実行</button>
-        <button onClick={onClose}>閉じる</button>
+        <button onClick={onPrint}>{t('print.exec')}</button>
+        <button onClick={onClose}>{t('print.close')}</button>
       </div>
       <div>
         {rects.map((pr) => (

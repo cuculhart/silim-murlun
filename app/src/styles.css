@@ -325,6 +325,27 @@ body,
   min-height: 0;
 }
 
+/* G4: 右方向へ折りたたみ */
+.right-dock.collapsed {
+  width: 24px;
+  overflow: hidden;
+}
+
+.dock-toggle {
+  flex: none;
+  height: 40px;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface2);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.right-dock.collapsed .dock-toggle {
+  height: 100%;
+}
+
 .chain-pane {
   flex: 1;
   display: flex;

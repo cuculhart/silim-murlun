@@ -2,6 +2,7 @@
 // 先頭/前/次 + 現在ページ表示 + 番号ジャンプ。移動のみ（追加/削除は左メニュー）。
 
 import { useState } from 'react';
+import type { TFunc } from './i18n';
 
 export function PageNav({
   current,
@@ -9,6 +10,7 @@ export function PageNav({
   collapsed,
   onToggle,
   onGo,
+  t,
 }: {
   /** 表示中ページ（0-based index。-1 なら gap/圏外） */
   current: number;
@@ -17,6 +19,7 @@ export function PageNav({
   onToggle: () => void;
   /** 0-based index へ移動 */
   onGo: (index: number) => void;
+  t: TFunc;
 }) {
   const [jump, setJump] = useState('');
   const shown = current >= 0 ? current + 1 : 1;
@@ -27,7 +30,7 @@ export function PageNav({
       <button
         className="page-nav collapsed"
         onClick={onToggle}
-        title="ページ送りを開く"
+        title={t('nav.open')}
       >
         p.{shown}/{total}
       </button>
@@ -35,10 +38,10 @@ export function PageNav({
   }
   return (
     <div className="page-nav">
-      <button onClick={() => go(0)} title="先頭ページ">
+      <button onClick={() => go(0)} title={t('nav.first')}>
         ≪
       </button>
-      <button onClick={() => go(current - 1)} title="前ページ">
+      <button onClick={() => go(current - 1)} title={t('nav.prev')}>
         ＜
       </button>
       <span className="pn-cur">
@@ -60,10 +63,10 @@ export function PageNav({
         {' / '}
         {total}
       </span>
-      <button onClick={() => go(current + 1)} title="次ページ">
+      <button onClick={() => go(current + 1)} title={t('nav.next')}>
         ＞
       </button>
-      <button className="pn-fold" onClick={onToggle} title="畳む">
+      <button className="pn-fold" onClick={onToggle} title={t('nav.fold')}>
         −
       </button>
     </div>

@@ -39,9 +39,9 @@ export const DEFAULT_TEXT_DATA: TextAreaData = {
 
 export const FONT_SIZES_MM = [3, 4, 5, 7, 9];
 export const FONT_FAMILIES = [
-  { value: 'sans-serif', label: 'ゴシック' },
-  { value: 'serif', label: '明朝' },
-  { value: 'monospace', label: '等幅' },
+  { value: 'sans-serif', label: 'Sans-serif' },
+  { value: 'serif', label: 'Serif' },
+  { value: 'monospace', label: 'Monospace' },
 ];
 
 /** ドラッグ/リサイズ中のライブ矩形。

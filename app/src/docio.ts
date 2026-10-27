@@ -20,6 +20,7 @@ interface ArchiveDoc {
   objects: WorldObject[];
   chains: Chain[];
   footer: boolean;
+  pageOpacity: number;
 }
 
 const EXT_OF_MIME: Record<string, string> = {
@@ -62,6 +63,7 @@ export function packArchive(input: {
   footer: boolean;
   title: string;
   createdAt: string;
+  pageOpacity: number;
 }): Uint8Array {
   const files: Record<string, Uint8Array> = {};
   let imgN = 0;
@@ -84,6 +86,7 @@ export function packArchive(input: {
     objects,
     chains: input.chains,
     footer: input.footer,
+    pageOpacity: input.pageOpacity,
   };
   files['doc.json'] = strToU8(JSON.stringify(doc));
   return zipSync(files);
@@ -97,6 +100,7 @@ export function unpackArchive(bytes: Uint8Array): {
   footer: boolean;
   title: string;
   createdAt: string;
+  pageOpacity: number;
 } {
   const files = unzipSync(bytes);
   const raw = files['doc.json'];
@@ -124,5 +128,6 @@ export function unpackArchive(bytes: Uint8Array): {
     footer: doc.footer !== false,
     title: doc.title ?? '',
     createdAt: doc.createdAt ?? '',
+    pageOpacity: doc.pageOpacity ?? 100,
   };
 }

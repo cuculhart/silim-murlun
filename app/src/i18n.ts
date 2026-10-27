@@ -1,0 +1,233 @@
+// i18n — 日本語ファースト。キー参照型の軽量辞書。
+// sethera 系と同様、メニュー最上段のボタンで ja/en を切り替える。
+
+export type Lang = 'ja' | 'en';
+export type TFunc = (key: string) => string;
+
+const ja = {
+  // メニュー
+  'menu.open': 'メニューを開く',
+  'menu.fold': 'メニューを畳む',
+  'menu.new': '新規',
+  'menu.openDoc': '開く…',
+  'menu.save': '名前を付けて保存',
+  'menu.saveTip': '書庫 (.slm) として保存（Ctrl+S）',
+  'menu.undo': '取り消し',
+  'menu.redo': 'やり直し',
+  'menu.ruler': 'ルーラー',
+  'menu.fit': 'ページを全体表示',
+  'menu.fitTip': 'ページ全体が収まる倍率にズーム',
+  'menu.link': 'リンクモード',
+  'menu.linkTip': '末尾→先頭の2エリアを接続',
+  'menu.image': '画像を追加',
+  'menu.rect': '矩形',
+  'menu.rectTip': '矩形ツール — ドラッグで配置',
+  'menu.ellipse': '楕円',
+  'menu.ellipseTip': '楕円ツール — ドラッグで配置',
+  'menu.line': '直線',
+  'menu.lineTip': '直線ツール — ドラッグで配置',
+  'menu.addPage': 'ページ追加',
+  'menu.delPage': '現在ページを削除',
+  'menu.delPageTip': 'アクティブページ枠を削除（オブジェクトは残る）',
+  'menu.print': '印刷',
+  'menu.theme': 'テーマ',
+  'menu.themeTip': 'テーマ切替（次は $1）',
+  'menu.lang': 'English',
+  'menu.langTip': 'Switch to English UI',
+
+  // 連鎖ペイン
+  'chain.title': '連鎖テキスト（$1エリア）',
+  'chain.close': '閉じる',
+  'chain.placeholder': 'ここに連鎖テキスト全体を入力…',
+  'chain.overflow': 'あふれ $1字 「$2…」',
+  'chain.font': 'フォント',
+  'chain.size': 'サイズ',
+  'chain.nolink': 'リンクなし（リンクモードで2エリアを接続）',
+  'chain.addArea': 'このエリアの後に連鎖エリアを追加',
+  'ta.overflow': 'あふれ $1字 「$2…」',
+  'ta.overflowTip': 'あふれ — クリックで連鎖テキストを開く',
+
+  // プロパティ
+  'doc.title': '文書',
+  'doc.name': 'タイトル',
+  'doc.untitled': '（無題）',
+  'doc.paper': '用紙',
+  'doc.landscape': '横置き',
+  'doc.pages': 'ページ',
+  'doc.add': '＋追加',
+  'doc.insertAfter': 'ページの後に',
+  'doc.insert': '挿入',
+  'doc.footer': 'フッターにページ番号（n / 全ページ）',
+  'doc.opacity': '用紙の透過',
+  'doc.hint': '未選択 / 複数選択 — オブジェクトを選ぶとプロパティが出ます',
+  'img.title': '画像',
+  'img.lock': 'アスペクト比をロック',
+  'sel.mixed': '選択（$1）',
+  'sel.mixedHint': '一括プロパティ編集はありません（画像を含む選択は対象外）',
+  'font.batch': 'テキストエリア（複数選択）',
+  'font.color': '文字色',
+  'font.batchHint': 'フォント系のみ一括変更できます',
+  'shape.title': 'シェイプ',
+  'shape.fill': '塗り色',
+  'shape.stroke': '線色',
+  'shape.width': '線幅',
+  'z.front': '最前面へ',
+  'z.forward': '一つ上へ',
+  'z.backward': '一つ下へ',
+  'z.back': '最背面へ',
+
+  // ページナビ / タグ
+  'nav.first': '先頭ページ',
+  'nav.prev': '前ページ',
+  'nav.next': '次ページ',
+  'nav.fold': '畳む',
+  'nav.open': 'ページ送りを開く',
+  'page.insertAfter': 'このページの次に挿入',
+  'page.delete': 'このページを削除',
+  'page.landscape': '横',
+  'page.portrait': '縦',
+  'status.pages': '$1ページ',
+  'theme.standard': '標準（OS連動）',
+  'theme.light': 'ライト',
+  'theme.dark': 'ダーク',
+  'theme.quiet': 'クワイエット',
+
+  // ヒント・通知
+  'hint.default':
+    '用紙上ダブルクリック=エリア / 線選択→Del=切断 / 右クリック=Z-order',
+  'hint.onPaper': '用紙の上をダブルクリックでテキストエリア',
+  'hint.linkFrom': '接続の起点は連鎖の末尾エリアです',
+  'hint.linkTo': '接続先は別連鎖の先頭エリアです',
+  'hint.cantOpen': '開けません: $1',
+  'confirm.new': '新規作成します。現在の内容は破棄されます。',
+
+  // ダイアログ・コンテキストメニュー・印刷
+  'dlg.filename': 'ファイル名',
+  'dlg.save': '保存',
+  'dlg.cancel': 'キャンセル',
+  'dlg.w': '幅',
+  'dlg.h': '高さ',
+  'dlg.place': '配置',
+  'ctx.unlink': '切断',
+  'print.exec': '印刷実行',
+  'print.close': '閉じる',
+} as const;
+
+const en: Record<keyof typeof ja, string> = {
+  'menu.open': 'Open menu',
+  'menu.fold': 'Collapse menu',
+  'menu.new': 'New',
+  'menu.openDoc': 'Open…',
+  'menu.save': 'Save as',
+  'menu.saveTip': 'Save as archive (.slm) (Ctrl+S)',
+  'menu.undo': 'Undo',
+  'menu.redo': 'Redo',
+  'menu.ruler': 'Rulers',
+  'menu.fit': 'Fit page',
+  'menu.fitTip': 'Zoom to fit the whole page',
+  'menu.link': 'Link mode',
+  'menu.linkTip': 'Connect tail → head of two areas',
+  'menu.image': 'Add image',
+  'menu.rect': 'Rectangle',
+  'menu.rectTip': 'Rectangle tool — drag to place',
+  'menu.ellipse': 'Ellipse',
+  'menu.ellipseTip': 'Ellipse tool — drag to place',
+  'menu.line': 'Line',
+  'menu.lineTip': 'Line tool — drag to place',
+  'menu.addPage': 'Add page',
+  'menu.delPage': 'Delete current page',
+  'menu.delPageTip': 'Delete the active page frame (objects remain)',
+  'menu.print': 'Print',
+  'menu.theme': 'Theme',
+  'menu.themeTip': 'Switch theme (next: $1)',
+  'menu.lang': 'Japanese',
+  'menu.langTip': '日本語 UI に切り替え',
+
+  'chain.title': 'Chain text ($1 areas)',
+  'chain.close': 'Close',
+  'chain.placeholder': 'Enter the whole chain text here…',
+  'chain.overflow': 'Overflow $1 chars "$2…"',
+  'chain.font': 'Font',
+  'chain.size': 'Size',
+  'chain.nolink': 'Not linked (connect two areas in link mode)',
+  'chain.addArea': 'Add a chained area after this one',
+  'ta.overflow': 'Overflow $1 chars "$2…"',
+  'ta.overflowTip': 'Overflow — click to open chain text',
+
+  'doc.title': 'Document',
+  'doc.name': 'Title',
+  'doc.untitled': '(untitled)',
+  'doc.paper': 'Paper',
+  'doc.landscape': 'Landscape',
+  'doc.pages': 'pages',
+  'doc.add': '+ Add',
+  'doc.insertAfter': 'Insert after page',
+  'doc.insert': 'Insert',
+  'doc.footer': 'Footer page number (n / total)',
+  'doc.opacity': 'Paper opacity',
+  'doc.hint': 'Nothing / multiple selected — select an object for properties',
+  'img.title': 'Image',
+  'img.lock': 'Lock aspect ratio',
+  'sel.mixed': 'Selection ($1)',
+  'sel.mixedHint':
+    'No batch property editing (selections containing images are excluded)',
+  'font.batch': 'Text areas (multiple)',
+  'font.color': 'Text color',
+  'font.batchHint': 'Only font properties can be changed in batch',
+  'shape.title': 'Shape',
+  'shape.fill': 'Fill',
+  'shape.stroke': 'Stroke',
+  'shape.width': 'Width',
+  'z.front': 'Bring to front',
+  'z.forward': 'Bring forward',
+  'z.backward': 'Send backward',
+  'z.back': 'Send to back',
+
+  'nav.first': 'First page',
+  'nav.prev': 'Previous page',
+  'nav.next': 'Next page',
+  'nav.fold': 'Collapse',
+  'nav.open': 'Open page navigation',
+  'page.insertAfter': 'Insert after this page',
+  'page.delete': 'Delete this page',
+  'page.landscape': 'L',
+  'page.portrait': 'P',
+  'status.pages': '$1 pages',
+  'theme.standard': 'Standard (OS)',
+  'theme.light': 'Light',
+  'theme.dark': 'Dark',
+  'theme.quiet': 'Quiet',
+
+  'hint.default':
+    'Double-click on paper = text area / select wire + Del = unlink / right-click = Z-order',
+  'hint.onPaper': 'Double-click on paper to create a text area',
+  'hint.linkFrom': 'The link source must be the last area of a chain',
+  'hint.linkTo': 'The target must be the first area of another chain',
+  'hint.cantOpen': "Can't open: $1",
+  'confirm.new': 'Create a new document? Current content will be discarded.',
+
+  'dlg.filename': 'File name',
+  'dlg.save': 'Save',
+  'dlg.cancel': 'Cancel',
+  'dlg.w': 'W',
+  'dlg.h': 'H',
+  'dlg.place': 'Place',
+  'ctx.unlink': 'Unlink',
+  'print.exec': 'Print',
+  'print.close': 'Close',
+};
+
+const DICT: Record<Lang, Record<string, string>> = { ja, en };
+
+export function makeT(lang: Lang): TFunc {
+  return (key: string) => DICT[lang][key] ?? ja[key as keyof typeof ja] ?? key;
+}
+
+/** 文字列内の $1, $2… を置換する小ヘルパ */
+export function tf(t: TFunc, key: string, ...args: (string | number)[]) {
+  let s = t(key);
+  args.forEach((a, i) => {
+    s = s.replaceAll(`$${i + 1}`, String(a));
+  });
+  return s;
+}

@@ -3,6 +3,8 @@
 // IME 確定・キャレット維持・順序崩れの問題が構造的に消える設計。
 
 import type { Chain } from 'inimbal';
+import type { TFunc } from './i18n';
+import { tf } from './i18n';
 import type { TextAreaData } from './types';
 import { FONT_FAMILIES, FONT_SIZES_MM } from './types';
 
@@ -14,6 +16,7 @@ export function ChainPane({
   onText,
   onAreaData,
   onClose,
+  t,
 }: {
   chain: Chain;
   areaData: TextAreaData | null;
@@ -21,12 +24,13 @@ export function ChainPane({
   onText: (text: string) => void;
   onAreaData: (patch: Partial<TextAreaData>) => void;
   onClose: () => void;
+  t: TFunc;
 }) {
   return (
     <aside className="chain-pane">
       <header>
-        <span>連鎖テキスト（{chain.areas.length}エリア）</span>
-        <button onClick={onClose} title="閉じる">
+        <span>{tf(t, 'chain.title', chain.areas.length)}</span>
+        <button onClick={onClose} title={t('chain.close')}>
           ×
         </button>
       </header>
@@ -34,19 +38,23 @@ export function ChainPane({
         className="chain-text"
         value={chain.text}
         spellCheck={false}
-        placeholder="ここに連鎖テキスト全体を入力…"
+        placeholder={t('chain.placeholder')}
         onChange={(e) => onText(e.currentTarget.value)}
       />
       {overflow && (
         <div className="chain-overflow">
-          あふれ {overflow.length}字 「{overflow.replace(/\n/g, '⏎').slice(0, 14)}
-          …」
+          {tf(
+            t,
+            'chain.overflow',
+            overflow.length,
+            overflow.replace(/\n/g, '⏎').slice(0, 14),
+          )}
         </div>
       )}
       {areaData && (
         <div className="chain-font">
           <label>
-            フォント
+            {t('chain.font')}
             <select
               value={areaData.fontFamily}
               onChange={(e) =>
@@ -61,7 +69,7 @@ export function ChainPane({
             </select>
           </label>
           <label>
-            サイズ
+            {t('chain.size')}
             <select
               value={areaData.fontSize}
               onChange={(e) =>
@@ -80,7 +88,7 @@ export function ChainPane({
       <footer className="chain-links">
         {chain.areas.length > 1
           ? `${chain.areas.join(' → ')}`
-          : 'リンクなし（リンクモードで2エリアを接続）'}
+          : t('chain.nolink')}
       </footer>
     </aside>
   );
