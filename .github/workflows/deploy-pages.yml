@@ -30,11 +30,12 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build -w silim-app
-      # Pages 固有のステップは PR では不要＆権限エラー回避のためスキップ
+      # Pages 固有のステップは手動デプロイ時のみ（Pages 未有効化のため
+      # push/PR ではスキップ — 有効化後も deploy job と同じ条件に揃える）
       - uses: actions/configure-pages@v6
-        if: github.event_name != 'pull_request'
+        if: github.event_name == 'workflow_dispatch'
       - uses: actions/upload-pages-artifact@v5
-        if: github.event_name != 'pull_request'
+        if: github.event_name == 'workflow_dispatch'
         with:
           path: app/dist
 
