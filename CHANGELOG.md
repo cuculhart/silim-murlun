@@ -76,6 +76,25 @@ kimetron は 1.6.0 へ更新（B6 端子スケール・P49 多点入力・resize
 
 ## [0.5.0] - 2026-10-27
 
+### English
+
+Shape vertex editing moved into the engine (kimetron 1.5.0) plus the
+curve tool.
+
+- Curve tool (~): drag to place a shallow arc, then shape it with the
+  vertex grips — minimal implementation (click-chained multi-point
+  input not yet — kimetron P49). Printing handled via Catmull-Rom
+  expansion
+- Vertex grips (F21) migrated to kimetron's vertex editing
+  (P48 — `.ki-vtx` handles + `vertex` mode): double-click a grip to
+  delete the anchor, double-click a selected curve/polygon outline to
+  insert one. The app's own overlay (Grips.tsx) was removed
+- Fix: line/curve properties showed a fill field (open chords never
+  fill — hidden to avoid confusion)
+- kimetron submodule updated to v1.5.0
+
+### 日本語
+
 シェイプ頂点編集のエンジン化（kimetron 1.5.0）と曲線ツール。
 
 - 曲線ツール（〜）: ドラッグで浅い弧を配置し、頂点グリップで
@@ -91,6 +110,49 @@ kimetron は 1.6.0 へ更新（B6 端子スケール・P49 多点入力・resize
 - kimetron submodule を v1.5.0 へ更新
 
 ## [0.4.0] - 2026-10-27
+
+### English
+
+A sweep of accumulated bugs plus expanded editing power
+(v0.4.0-plan.md B1–B5, F21–F24). kimetron updated to 1.4.1
+(frame-width and shape-svg fixes).
+
+- Grips (vertex editing): □ grips on the anchors of a single-selected
+  line/curve/polygon — drag to edit vertices directly. The bbox
+  re-normalizes on every anchor (degenerate axes collapse to the
+  midpoint); grid snap, rotated objects and Undo all apply
+- Line caps & dash: start/end caps (none/arrow/dot) and dash styles
+  (solid/dashed/dotted) for lines/curves. The canvas uses kimetron's
+  cap/dash rendering as-is; print reproduces markers and dashes at
+  true size via a mm viewBox (line-width print conversion also fixed)
+- Text attributes: bold/italic/underline/color added to TextAreaData
+  and reflected in measurement, rendering, printing and batch editing
+- Snap temporary release: hold Alt to disable grid/object snapping
+  (applies to drag, resize, rotate and grip editing)
+- Line tool: horizontal/vertical drags produce a straight line with
+  edge-center anchors instead of a diagonal chord (sethera parity).
+  The drag start is kept as the chord's first anchor
+- Change: paper opacity default 100% → 50% (new documents too;
+  archives restore the saved value)
+- Fix: shape fill color vs property display mismatch — the alpha of
+  rgba/#rrggbbaa was ignored and colors were shown/overwritten as
+  opaque. Added an opacity (%) field per color; color changes now keep
+  alpha (initial fill unified to #rrggbbaa)
+- Fix: horizontal/vertical lines disappearing — when a resize pushed
+  w/h to near 0 (min 0.001mm) the shape `<svg>` collapsed to zero
+  size and rendering was disabled entirely (overflow:visible can't
+  rescue it). kimetron clamps the svg viewport to 1px; print output
+  gets a 0.1mm floor
+- Fix: border remaining at width 0 — kimetron 1.4.1 drives `.ki-obj`
+  border width from `style.width`, and the app's temporary CSS was
+  removed (rect delegates to native rendering)
+- Fix: bold/italic/underline/color could not be changed for a single
+  text area — the chain pane gained B/I/U and color controls
+  (previously only available in batch selection)
+- Fix: a text area's fill hid shapes underneath — the default fill
+  was removed/transparentized
+
+### 日本語
 
 溜まった不具合の一掃と編集力の拡充（v0.4.0-plan.md の B1–B5・F21–F24）。
 kimetron は 1.4.1 へ更新（枠幅・shape svg の修正を取り込み）。
@@ -132,6 +194,28 @@ kimetron は 1.4.1 へ更新（枠幅・shape svg の修正を取り込み）。
 
 ## [0.3.0] - 2026-10-27
 
+### English
+
+Visibility, navigation automation and internationalization
+(v0.3.0-plan.md G1–G5).
+
+- Page fit & top-left align: auto-zooms so the whole page fits and
+  places the page's top-left (ruler origin) at the canvas corner.
+  Applied on navigation/new/open; manual via the "Fit page" button
+- Ruler: moved to strips along the active page frame's top/left
+  edges, with 5mm-grid-aligned ticks
+- Paper opacity: a slider in the document properties (0–100%; 0%
+  shows frame outlines only). Included in archives and Undo/Redo
+- Inspector collapse: the right pane folds away to the right
+- English: the "Aa" button at the top of the menu toggles ja/en
+  (persisted to localStorage). Menus, panes, dialogs, hints, status,
+  page tags and badges are all translated; icons switch to Latin
+  letters/symbols in English
+- Startup demo data removed (opens with an empty document)
+- GitHub Pages workflow added (manual trigger only for now)
+
+### 日本語
+
 視認性・ナビゲーションの自動化・多言語化（v0.3.0-plan.md の G1–G5）。
 
 - ページフィット＆左上合わせ: ページ全体が収まる倍率に自動ズームし、
@@ -150,6 +234,34 @@ kimetron は 1.4.1 へ更新（枠幅・shape svg の修正を取り込み）。
 - GitHub Pages 用ワークフロー追加（現時点では手動実行のみ）
 
 ## [0.2.0] - 2026-10-27
+
+### English
+
+Production-grade precision and recoverability
+(v0.2.0-plan.md F14–F18, F20).
+
+- Rulers: mm ticks along the active page frame's top/left edges —
+  pan/zoom follow, 5mm-grid-aligned ticks, cursor position marker,
+  ON/OFF toggle
+- Save as: filename input dialog (defaults to the document title).
+  The document properties get a title field; archives store and
+  restore title/createdAt/updatedAt metadata
+- Undo/Redo: integrated snapshot history covering doc + chains +
+  pages + settings. Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y and menu buttons;
+  500ms of continuous edits folds into one entry, capped at 100
+- Chain mid-insert: "Add a chained area after this one" inserts an
+  area right after the selected one
+- Wire right-click unlink (a second unlink path besides Del)
+- Image resize aspect-ratio constraint (corrected on commit when
+  locked)
+- Shortcuts: Ctrl+S save as, `beforeunload` unsaved-changes warning
+- Fix: middle-button pan triggered browser autoscroll and moved the
+  whole viewport (document scroll disabled + middle-button default
+  suppressed)
+- Fix: new area IDs could collide with demo/loaded objects (existing
+  IDs are scanned before allocating)
+
+### 日本語
 
 制作実務の精度と回復力（v0.2.0-plan.md の F14–F18・F20）。
 
@@ -174,6 +286,35 @@ kimetron は 1.4.1 へ更新（枠幅・shape svg の修正を取り込み）。
   （既存 ID を走査して空きを採番）
 
 ## [0.1.0] - 2026-10-27
+
+### English
+
+First release — the walking skeleton of "a print-first page layout
+editor where you place things at true size on graph paper, with text
+flowing across pages" (v0.1.0-plan.md F1–F13).
+
+- Page model: A4/A3 × portrait/landscape, arranged vertically in
+  world mm coordinates. Add, insert anywhere, delete (frames only) —
+  swapping paper size leaves object coordinates unchanged
+- Active page: click a page frame to select it; navigation, deletion
+  and highlighting follow
+- Text chains: display-only areas with greedy text distribution,
+  overflow badges, linear one-way links (tail → head), rollback
+  unlinking, and the chain edit pane
+- Images: file pick → true-size ghost → click to place. mm editing,
+  aspect-ratio lock, Z-order (right-click menu)
+- Shapes: rectangle, ellipse, line (drag to place, mm stroke widths,
+  batch editing)
+- True-size printing: in-document overlay + beforeprint handling,
+  dynamic `@page` setup, page-number footer (ON/OFF)
+- Archive: custom .slm format (zip: doc.json + image binaries).
+  New/Open/Save
+- Layout: collapsible left menu + canvas + right inspector,
+  floating page navigation (collapsible), status bar
+- Themes: Standard (OS-driven) / Light / Dark / Quiet
+- Grid: 5mm graph paper + 10mm major lines, 5mm snapping
+
+### 日本語
 
 初回リリース。「方眼紙に実寸で置いていく、ページ跨ぎ文字送りつきの
 印刷物ファーストなページレイアウトエディタ」の歩く骨格
