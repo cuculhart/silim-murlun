@@ -6,6 +6,8 @@ export type TFunc = (key: string) => string;
 
 const ja = {
   // メニュー
+  'canvas.hint':
+    '用紙をダブルクリックでテキストエリアを追加 — 左のツールでシェイプ・画像も置けます',
   'menu.open': 'メニューを開く',
   'menu.fold': 'メニューを畳む',
   'menu.new': '新規',
@@ -148,6 +150,8 @@ const ja = {
 } as const;
 
 const en: Record<keyof typeof ja, string> = {
+  'canvas.hint':
+    'Double-click the paper to add a text area — shapes and images from the left toolbar',
   'menu.open': 'Open menu',
   'menu.fold': 'Collapse menu',
   'menu.new': 'New',

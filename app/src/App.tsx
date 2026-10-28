@@ -1214,6 +1214,10 @@ export function App() {
             style={{ position: 'absolute', inset: 0 }}
             renderObject={renderObject}
           />
+          {/* 空ドキュメントの初見ヒント（ページ枠のみの時に表示） */}
+          {!engine.doc.objects.some((o) => o.kind !== PAGE_KIND) && (
+            <div className="canvas-hint">{t('canvas.hint')}</div>
+          )}
           <LinkWires
             engine={engine}
             chains={chains}
