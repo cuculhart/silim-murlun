@@ -9,8 +9,6 @@ printing.
 > Place things at real size on graph paper, and let the text cross
 > over wires between frames.
 
-[![CI](https://github.com/cuculhart/silim-murlun/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/cuculhart/silim-murlun/actions/workflows/deploy-pages.yml)
-
 ![Editing a document](doc/screenshot.png)
 
 **[Live demo](https://cuculhart.github.io/silim-murlun/)** — runs in your browser, no install

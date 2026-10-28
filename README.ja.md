@@ -7,8 +7,6 @@ English: [README.md](README.md)
 
 > ミリ単位で決まる、ずれない版面。文字は線で次の枠へ渡す。
 
-[![CI](https://github.com/cuculhart/silim-murlun/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/cuculhart/silim-murlun/actions/workflows/deploy-pages.yml)
-
 ![文書編集画面](doc/screenshot.png)
 
 **[Live demo](https://cuculhart.github.io/silim-murlun/)** — インストール不要・ブラウザだけで動きます
