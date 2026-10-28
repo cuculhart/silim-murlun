@@ -30,6 +30,7 @@ export function Printout({
   footer,
   objects,
   sliceText,
+  areaAlone,
   onPrint,
   onClose,
   t,
@@ -39,6 +40,8 @@ export function Printout({
   objects: WorldObject[];
   /** テキストエリア → 表示中スライス（連鎖レイアウト済み） */
   sliceText: (o: WorldObject) => string;
+  /** 単独（非連鎖）テキストエリアか — 揃えは単独のみ有効 */
+  areaAlone: (o: WorldObject) => boolean;
   onPrint: () => void;
   onClose: () => void;
   t: (key: string) => string;
@@ -124,14 +127,18 @@ export function Printout({
                   .join(' ');
                 const ms = `pmk-${o.id}-s`;
                 const me = `pmk-${o.id}-e`;
+                // 端子は線幅比例（B6）— 0.5mm 基準サイズを維持しつつ
+                // 太線ではマーカーが線の中に埋もれないよう拡大する
+                const mk = Math.max(1, wMm / 0.5);
                 const cap = (id: string, kind: string) =>
                   kind === 'arrow' ? (
                     <marker
                       id={id}
                       markerUnits="userSpaceOnUse"
                       orient="auto-start-reverse"
-                      markerWidth={2.7}
-                      markerHeight={2.2}
+                      markerWidth={2.7 * mk}
+                      markerHeight={2.2 * mk}
+                      viewBox="0 0 2.6 2.1"
                       refX={2.4}
                       refY={1.05}
                     >
@@ -142,8 +149,9 @@ export function Printout({
                       id={id}
                       markerUnits="userSpaceOnUse"
                       orient="auto-start-reverse"
-                      markerWidth={2.2}
-                      markerHeight={2.2}
+                      markerWidth={2.2 * mk}
+                      markerHeight={2.2 * mk}
+                      viewBox="0 0 2.1 2.1"
                       refX={1.05}
                       refY={1.05}
                     >
@@ -186,6 +194,7 @@ export function Printout({
               }
               if (o.kind === TEXT_KIND) {
                 const d = { ...DEFAULT_TEXT_DATA, ...(o.data as TextAreaData) };
+                const alone = areaAlone(o);
                 return (
                   <div
                     key={o.id}
@@ -202,6 +211,16 @@ export function Printout({
                       fontWeight: d.bold ? 'bold' : undefined,
                       fontStyle: d.italic ? 'italic' : undefined,
                       textDecoration: d.underline ? 'underline' : undefined,
+                      textAlign: alone ? d.halign : undefined,
+                      ...(alone &&
+                      (d.valign === 'middle' || d.valign === 'bottom')
+                        ? {
+                            display: 'flex',
+                            flexDirection: 'column' as const,
+                            justifyContent:
+                              d.valign === 'middle' ? 'center' : 'flex-end',
+                          }
+                        : {}),
                     }}
                   >
                     <span style={{ color: d.color }}>{sliceText(o)}</span>

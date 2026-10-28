@@ -54,6 +54,40 @@ const ZOPS: { op: ZOrder; key: string }[] = [
   { op: 'back', key: 'z.back' },
 ];
 
+const ALIGNS: { op: string; key: string }[] = [
+  { op: 'left', key: 'align.left' },
+  { op: 'hcenter', key: 'align.hcenter' },
+  { op: 'right', key: 'align.right' },
+  { op: 'top', key: 'align.top' },
+  { op: 'vcenter', key: 'align.vcenter' },
+  { op: 'bottom', key: 'align.bottom' },
+  { op: 'hdist', key: 'align.hdist' },
+  { op: 'vdist', key: 'align.vdist' },
+];
+
+function AlignButtons({
+  onAlign,
+  t,
+}: {
+  onAlign: (op: string) => void;
+  t: TFunc;
+}) {
+  return (
+    <div className="doc-props">
+      <header>
+        <span>{t('align.title')}</span>
+      </header>
+      <div className="z-btns">
+        {ALIGNS.map((a) => (
+          <button key={a.op} onClick={() => onAlign(a.op)}>
+            {t(a.key)}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ZButtons({
   onReorder,
   t,
@@ -119,6 +153,7 @@ export function RightDock({
   onImageData,
   onStyle,
   onReorder,
+  onAlign,
   onDeselect,
   onAddArea,
   collapsed,
@@ -136,6 +171,7 @@ export function RightDock({
   onImageData: (patch: Partial<ImageData>) => void;
   onStyle: (patch: StylePatch) => void;
   onReorder: (op: ZOrder) => void;
+  onAlign: (op: string) => void;
   onDeselect: () => void;
   onAddArea: () => void;
   collapsed: boolean;
@@ -177,6 +213,43 @@ export function RightDock({
         />
         <div className="sub-props">
           <MmFields obj={one} onRect={onRect} />
+          {/* 揃えは単独（非連鎖）エリアのみ — 連鎖は左上起点固定 */}
+          {chain.areas.length === 1 && (
+            <>
+              <label className="img-lock">
+                {t('ta.halign')}
+                <select
+                  value={(one.data as TextAreaData).halign ?? 'left'}
+                  onChange={(e) =>
+                    onAreaData({
+                      halign: e.currentTarget
+                        .value as TextAreaData['halign'],
+                    })
+                  }
+                >
+                  <option value="left">{t('ta.left')}</option>
+                  <option value="center">{t('ta.center')}</option>
+                  <option value="right">{t('ta.right')}</option>
+                </select>
+              </label>
+              <label className="img-lock">
+                {t('ta.valign')}
+                <select
+                  value={(one.data as TextAreaData).valign ?? 'top'}
+                  onChange={(e) =>
+                    onAreaData({
+                      valign: e.currentTarget
+                        .value as TextAreaData['valign'],
+                    })
+                  }
+                >
+                  <option value="top">{t('ta.top')}</option>
+                  <option value="middle">{t('ta.middle')}</option>
+                  <option value="bottom">{t('ta.bottom')}</option>
+                </select>
+              </label>
+            </>
+          )}
           <button className="ins-btn" onClick={onAddArea}>
             {t('chain.addArea')}
           </button>
@@ -211,6 +284,14 @@ export function RightDock({
     );
   } else {
     body = <DocProps {...docProps} t={t} />;
+  }
+  if (selObjs.length > 1) {
+    body = (
+      <>
+        {body}
+        <AlignButtons onAlign={onAlign} t={t} />
+      </>
+    );
   }
   return (
     <aside className={collapsed ? 'right-dock collapsed' : 'right-dock'}>
@@ -429,6 +510,22 @@ function ShapeProps({
             %
           </span>
         </label>
+        {/* F28: 矩形・楕円の枠線 OFF — 'transparent' で明示的に消す
+            （stroke 未設定はエンジン既定色へ戻るため OFF にならない） */}
+        {!isLine && (
+        <label>
+          {t('shape.border')}
+          <input
+            type="checkbox"
+            checked={(o.style?.stroke ?? 'transparent') !== 'transparent'}
+            onChange={(e) =>
+              onStyle({
+                stroke: e.currentTarget.checked ? toHex(stroke) : 'transparent',
+              })
+            }
+          />
+        </label>
+        )}
         <label>
           {t('shape.width')}
           <input

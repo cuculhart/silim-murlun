@@ -32,6 +32,10 @@ export interface TextAreaData {
   bold?: boolean;
   italic?: boolean;
   underline?: boolean;
+  /** 縦揃え（単独エリアのみ有効 — 連鎖エリアは常に top） */
+  valign?: 'top' | 'middle' | 'bottom';
+  /** 横揃え（単独エリアのみ有効 — 連鎖エリアは常に left） */
+  halign?: 'left' | 'center' | 'right';
 }
 
 export const DEFAULT_TEXT_DATA: TextAreaData = {

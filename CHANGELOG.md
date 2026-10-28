@@ -2,6 +2,78 @@
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-28
+
+### English
+
+Multi-selection workflow completion (duplicate / grouping) plus
+multi-point curve input. kimetron updated to 1.6.0 (B6 stroke-scaled
+caps, P49 multi-point draw, resizeAspect hook).
+
+- Duplicate / copy & paste (F25): Ctrl+D, Ctrl+C/V. Shapes, images and
+  text areas are copied one grid step over and the copies get selected.
+  Copied text areas become standalone single-area chains — links are
+  not carried over, but font settings and the source chain's full text
+  are (overflow shows honestly). A multi-selection duplicates
+  everything; copied group members are re-keyed to a new group.
+- Shape grouping (F26): uses kimetron's `group` field. The context
+  menu gains Group/Ungroup. One click on a member selects the whole
+  group; clicking again dives to the member (click-through); Alt+drag
+  detaches a member, per kimetron.
+- Multi-point curve input (F27): the "~" tool is now click-chained
+  vertex input (kimetron P49 `startShapeDraw` / `'shape'` mode).
+  Points snap to the grid with a dashed preview; Enter/double-click
+  commits, Esc cancels. The result is immediately editable via the
+  vertex grips (`.ki-vtx`).
+- Rect/ellipse border ON/OFF (F28): a "Border" checkbox in the
+  properties. OFF writes an explicit `stroke:'transparent'` (distinct
+  from width 0).
+- Align & distribute (F29): eight buttons in the inspector for
+  multi-selections — left/center/right, top/middle/bottom, and
+  horizontal/vertical equal spacing.
+- Text area alignment: standalone (unchained) areas get horizontal
+  (left/center/right) and vertical (top/middle/bottom) alignment.
+  Chained areas stay anchored top-left.
+- Fix (B6): thick-line caps (arrows/dots) were buried by the stroke.
+  kimetron 1.6.0 scales cap markers with stroke width (`userSpaceOnUse`
+  + `viewBox`); the print output scales them the same way.
+- Image resize: aspect-lock moved to kimetron's `resizeAspect` hook,
+  constraining corner drags live (post-commit correction kept for edge
+  drags).
+
+### 日本語
+
+複製・グルーピング（複数選択ワークフローの完成）＋ 曲線の多点入力。
+kimetron は 1.6.0 へ更新（B6 端子スケール・P49 多点入力・resizeAspect
+フックを取り込み）。
+
+- 複製/コピー＆ペースト（F25）: Ctrl+D・Ctrl+C/V。シェイプ・画像・
+  テキストエリアをグリッド1段ずらして複製し複製物を選択。
+  テキストエリアはリンクを引き継がず単独エリアの新連鎖となり、
+  フォント等の設定と元連鎖の全文を引き継ぐ（収まらない分はあふれ
+  表示）。複数選択は全選択を複製。グループは複製時に新規グループへ
+  振り直し
+- 図形のグルーピング（F26）: kimetron の `group` フィールドで束を
+  識別。右クリックメニューに「グループ化/解除」。グループ内1点
+  クリックで全体選択、全選択済みなら個別へ潜る（クリックスルー）、
+  Alt+drag で個別脱出は kimetron 準拠
+- 曲線の多点入力（F27）: 「〜」ツールがクリック連打による頂点入力に
+  刷新（kimetron P49 の `startShapeDraw` / `'shape'` mode を利用）。
+  点はグリッドにスナップし破線プレビュー、Enter/ダブルクリックで
+  確定、Esc で取消。確定後はそのまま頂点グリップ（.ki-vtx）で編集可
+- 矩形・楕円の枠線 ON/OFF（F28）: プロパティに「枠線」チェック。
+  OFF は `stroke:'transparent'` の明示的消去（線幅0とは別扱い）
+- 整列・分布（F29）: 複数選択時にプロパティペインへ
+  左/中央/右揃え・上/中央/下揃え・縦横等間隔の8ボタン
+- テキストエリアの揃え: 単独（非連鎖）エリアに横揃え（左/中央/右）と
+  縦揃え（上/中央/下）。リンク連鎖のエリアは左上起点固定のまま
+- 修正（B6）: 太い線の端子（矢印・●）が線幅に埋もれる。
+  kimetron 1.6.0 で cap マーカーを線幅スケール化（viewBox 付き
+  userSpaceOnUse）、印刷出力側も同率で拡大
+- 画像リサイズ: アスペクト比ロックは kimetron の `resizeAspect`
+  フックへ移行し、角ドラッグでライブ拘束（確定時補正は辺ドラッグ
+  用に残置）
+
 ## [0.5.0] - 2026-10-27
 
 シェイプ頂点編集のエンジン化（kimetron 1.5.0）と曲線ツール。

@@ -189,6 +189,11 @@ export function App() {
     engine.hitFilter = (o) => o.kind !== PAGE_KIND && !linkModeRef.current;
     engine.marqueeFilter = (o) =>
       o.kind !== PAGE_KIND && !linkModeRef.current;
+    // kimetron 1.6.0: アスペクト比ロック画像は角リサイズで比率を保持
+    engine.resizeAspect = (o) =>
+      o.kind === IMG_KIND && (o.data as ImageData)?.lock
+        ? (o.data as ImageData).aspect
+        : null;
     engine.setDoc({
       ...engine.doc,
       objects: pageObjects(model),
@@ -197,6 +202,13 @@ export function App() {
     focusPage(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine]);
+
+  // F27: 曲線ツール → kimetron P49 の多点入力モード
+  useEffect(() => {
+    if (shapeTool === 'curve') engine.startShapeDraw('curve');
+    else if (engine.mode === 'shape') engine.cancelShapeDraw();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shapeTool, engine]);
 
   // ── doc 変更 → 消えたエリアを連鎖から取り除く（テキストは保持→再配分） ──
   useEffect(
@@ -236,12 +248,34 @@ export function App() {
         redo();
         return;
       }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
+        e.preventDefault();
+        duplicateSel();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+        e.preventDefault();
+        copySel();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
+        e.preventDefault();
+        pasteSel();
+        return;
+      }
+      if (e.key === 'Enter' && engine.mode === 'shape') {
+        e.preventDefault();
+        commitCurve();
+        return;
+      }
       if (e.key === 'Escape') {
         setLinkMode(false);
         setLinkFrom(null);
         setSelLink(null);
+        setCtxMenu(null);
         setShapeTool(null);
         setShapeDrag(null);
+        if (engine.mode === 'shape') engine.cancelShapeDraw();
         if (placingRef.current) {
           setPlacing(null);
           setGhost(null);
@@ -485,16 +519,25 @@ export function App() {
   // ── テキストエリア生成（用紙上ダブルクリック） ──
   const onDblClick = (e: React.MouseEvent) => {
     if (linkModeRef.current || placingRef.current) return;
+    if (engine.mode === 'shape') {
+      commitCurve();
+      return;
+    }
     // ページ枠上のダブルクリックはエリア生成を許可する
     // （ページも data-ki-obj を持つため、コンテンツオブジェクト上のみ除外）
     const hitEl = (e.target as HTMLElement).closest?.(
-      '[data-ki-obj]',
+      '[data-ki-obj],[data-id]',
     ) as HTMLElement | null;
-    const hitObj = hitEl?.dataset.kiObj
-      ? engine.doc.objects.find((x) => x.id === hitEl.dataset.kiObj)
-      : undefined;
-    if (hitObj && hitObj.kind !== PAGE_KIND) return;
+    const hitId = hitEl?.dataset.kiObj ?? hitEl?.dataset.id;
     const r = canvasRef.current!.getBoundingClientRect();
+    const domH = hitId
+      ? engine.doc.objects.find((x) => x.id === hitId)
+      : undefined;
+    // .ki-shape は pointer-events:none — ページ着地を避けつつ幾何ヒットへ
+    const hitObj =
+      (domH && domH.kind !== PAGE_KIND ? domH : undefined) ??
+      engine.objectAt({ x: e.clientX - r.left, y: e.clientY - r.top });
+    if (hitObj && hitObj.kind !== PAGE_KIND) return;
     const w = engine.screenToWorld({
       x: e.clientX - r.left,
       y: e.clientY - r.top,
@@ -572,14 +615,49 @@ export function App() {
       return;
     }
     const objEl = (e.target as HTMLElement).closest?.(
-      '[data-ki-obj]',
+      '[data-ki-obj],[data-id]',
     ) as HTMLElement | null;
-    const o = objEl?.dataset.kiObj
-      ? engine.doc.objects.find((x) => x.id === objEl.dataset.kiObj)
+    const objId = objEl?.dataset.kiObj ?? objEl?.dataset.id;
+    const cr = canvasRef.current!.getBoundingClientRect();
+    const cpt = { x: e.clientX - cr.left, y: e.clientY - cr.top };
+    const domO = objId
+      ? engine.doc.objects.find((x) => x.id === objId)
       : undefined;
+    // .ki-shape は pointer-events:none で DOM を抜け、着地したページ枠が
+    // 拾われることがある — ページ以外の DOM 解決 → 幾何ヒット → ページ枠
+    const o =
+      (domO && domO.kind !== PAGE_KIND ? domO : undefined) ??
+      engine.objectAt(cpt) ??
+      engine.doc.objects.find((x) => {
+        if (x.kind !== PAGE_KIND) return false;
+        const w = engine.screenToWorld(cpt);
+        return (
+          w.x >= x.x && w.x <= x.x + x.w && w.y >= x.y && w.y <= x.y + x.h
+        );
+      });
     if (linkModeRef.current) {
       if (o?.kind === TEXT_KIND) pickLink(o.id);
       return;
+    }
+    // F26: グループ — エンジンがクリックで全体選択へ拡張するため、
+    // 同一メンバーの連続クリックのみ個別へ潜る（クリックスルー）
+    if (!e.shiftKey && o && o.kind !== PAGE_KIND && o.group) {
+      const members = engine.doc.objects
+        .filter((x) => x.group === o.group)
+        .map((x) => x.id);
+      const all = members.every((id) => engine.selectedIds.has(id));
+      if (
+        all &&
+        members.length > 1 &&
+        lastGroupClickRef.current === o.id
+      ) {
+        engine.setSelection([o.id]);
+      } else {
+        engine.setSelection(members);
+      }
+      lastGroupClickRef.current = o.id;
+    } else {
+      lastGroupClickRef.current = null;
     }
     // ページ枠クリック → アクティブページを切り替える
     if (o?.kind === PAGE_KIND) {
@@ -646,6 +724,186 @@ export function App() {
     const o = engine.doc.objects.find((x) => x.id === id);
     if (!o) return;
     patchObject(id, { data: { ...(o.data as ImageData), ...patch } });
+  };
+
+  // ── F25: 複製・コピー＆ペースト（テキストエリアは対象外） ──
+  const groupSeqRef = useRef(1);
+  const lastGroupClickRef = useRef<string | null>(null);
+  const copyBuf = useRef<WorldObject[]>([]);
+  const pasteN = useRef(0);
+  const dupSrcs = () =>
+    engine.doc.objects.filter(
+      (o) =>
+        engine.selectedIds.has(o.id) &&
+        !o.locked &&
+        o.kind !== PAGE_KIND,
+    );
+  const gridStep = () => (engine.doc.grid.size > 0 ? engine.doc.grid.size : 10);
+  const freshIdGen = () => {
+    const ids = new Set(engine.doc.objects.map((o) => o.id));
+    return (base: string) => {
+      let n = 1;
+      let id = `${base}-copy`;
+      while (ids.has(id)) id = `${base}-copy${++n}`;
+      ids.add(id);
+      return id;
+    };
+  };
+  const makeClones = (
+    srcs: WorldObject[],
+    dx: number,
+    dy: number,
+    gen: (s: string) => string,
+  ) => {
+    const gmap = new Map<string, string>();
+    return srcs.map((o) => {
+      let g: string | undefined;
+      if (o.group) {
+        g = gmap.get(o.group);
+        if (!g) {
+          g = `g${groupSeqRef.current++}`;
+          gmap.set(o.group, g);
+        }
+      }
+      return {
+        ...o,
+        id: gen(o.id),
+        x: o.x + dx,
+        y: o.y + dy,
+        group: g,
+        shape: o.shape
+          ? { ...o.shape, points: o.shape.points?.map((p) => ({ ...p })) }
+          : undefined,
+        style: o.style ? { ...o.style } : undefined,
+        data: o.data ? JSON.parse(JSON.stringify(o.data)) : undefined,
+      };
+    });
+  };
+  const addClones = (copies: WorldObject[], srcs: WorldObject[]) => {
+    if (!copies.length) return;
+    engine.setDoc({
+      ...engine.doc,
+      objects: [...engine.doc.objects, ...copies],
+    });
+    engine.setSelection(copies.map((o) => o.id));
+    // テキストエリアはリンクを引き継がず単独連鎖を新設し、フォント
+    // 等の設定（data）と元連鎖の全文を引き継ぐ — 収まらない分は
+    // あふれバッジで正直に出る
+    const taChains: Chain[] = copies
+      .map((c, i) => ({ c, s: srcs[i] }))
+      .filter(({ c }) => c.kind === TEXT_KIND)
+      .map(({ c, s }) => {
+        const src = chainOf(chainsRef.current, s.id);
+        const text = src ? src.text : (copyText.current.get(s.id) ?? '');
+        return { id: nextId('c'), areas: [c.id], text };
+      });
+    if (taChains.length) setChains((prev) => [...prev, ...taChains]);
+  };
+  const duplicateSel = () => {
+    const srcs = dupSrcs();
+    const s = gridStep();
+    addClones(makeClones(srcs, s, s, freshIdGen()), srcs);
+  };
+  const copyText = useRef(new Map<string, string>());
+  const copySel = () => {
+    const srcs = dupSrcs();
+    copyBuf.current = JSON.parse(JSON.stringify(srcs));
+    copyText.current = new Map(
+      srcs
+        .filter((o) => o.kind === TEXT_KIND)
+        .map((o) => {
+          const src = chainOf(chainsRef.current, o.id);
+          return [o.id, src ? src.text : ''];
+        }),
+    );
+    pasteN.current = 0;
+  };
+  const pasteSel = () => {
+    if (!copyBuf.current.length) return;
+    const s = gridStep() * ++pasteN.current;
+    addClones(makeClones(copyBuf.current, s, s, freshIdGen()), copyBuf.current);
+  };
+
+  // ── F26: グルーピング ──
+  const groupSelection = () => {
+    const g = `g${groupSeqRef.current++}`;
+    const sel = new Set(engine.selectedIds);
+    engine.setDoc({
+      ...engine.doc,
+      objects: engine.doc.objects.map((o) =>
+        sel.has(o.id) && !o.locked && o.kind !== PAGE_KIND
+          ? { ...o, group: g }
+          : o,
+      ),
+    });
+  };
+  const ungroupSelection = () => {
+    const sel = new Set(engine.selectedIds);
+    engine.setDoc({
+      ...engine.doc,
+      objects: engine.doc.objects.map((o) =>
+        sel.has(o.id) ? { ...o, group: undefined } : o,
+      ),
+    });
+  };
+
+  // ── F27: 曲線の多点入力（kimetron P49 の 'shape' mode） ──
+  const commitCurve = () => {
+    const o = engine.commitShapeDraw(nextId('sh'), {
+      style: { stroke: '#333333', width: MM_PX * 0.5 },
+      data: {},
+    });
+    if (o) setShapeTool(null);
+  };
+
+  // ── F29: 整列・分布 ──
+  const onAlign = (op: string) => {
+    const objs = engine.doc.objects.filter(
+      (o) =>
+        engine.selectedIds.has(o.id) && !o.locked && o.kind !== PAGE_KIND,
+    );
+    if (objs.length < 2) return;
+    const minX = Math.min(...objs.map((o) => o.x));
+    const maxX = Math.max(...objs.map((o) => o.x + o.w));
+    const minY = Math.min(...objs.map((o) => o.y));
+    const maxY = Math.max(...objs.map((o) => o.y + o.h));
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    const pos = new Map<string, Partial<WorldObject>>();
+    if (op === 'hdist' || op === 'vdist') {
+      if (objs.length < 3) return;
+      const s = [...objs].sort((a, b) =>
+        op === 'hdist'
+          ? a.x + a.w / 2 - (b.x + b.w / 2)
+          : a.y + a.h / 2 - (b.y + b.h / 2),
+      );
+      const f0 = s[0];
+      const f1 = s[s.length - 1];
+      const c0 = op === 'hdist' ? f0.x + f0.w / 2 : f0.y + f0.h / 2;
+      const c1 = op === 'hdist' ? f1.x + f1.w / 2 : f1.y + f1.h / 2;
+      s.forEach((o, i) => {
+        const c = c0 + ((c1 - c0) * i) / (s.length - 1);
+        pos.set(o.id, op === 'hdist' ? { x: c - o.w / 2 } : { y: c - o.h / 2 });
+      });
+    } else {
+      const fx: Record<string, (o: WorldObject) => Partial<WorldObject>> = {
+        left: () => ({ x: minX }),
+        hcenter: (o) => ({ x: cx - o.w / 2 }),
+        right: (o) => ({ x: maxX - o.w }),
+        top: () => ({ y: minY }),
+        vcenter: (o) => ({ y: cy - o.h / 2 }),
+        bottom: (o) => ({ y: maxY - o.h }),
+      };
+      const f = fx[op];
+      if (!f) return;
+      for (const o of objs) pos.set(o.id, f(o));
+    }
+    engine.setDoc({
+      ...engine.doc,
+      objects: engine.doc.objects.map((o) =>
+        pos.has(o.id) ? { ...o, ...pos.get(o.id) } : o,
+      ),
+    });
   };
 
   // ── 連鎖レイアウト（再描画のたびに貪欲配分） ──
@@ -748,6 +1006,8 @@ export function App() {
       const slice = lr?.slices.find((s) => s.areaId === o.id)?.text ?? '';
       const isLast = c ? c.areas[c.areas.length - 1] === o.id : false;
       const overflow = isLast ? (lr?.overflow ?? '') : '';
+      // リンク連鎖（複数エリア）は左上起点固定。単独エリアのみ揃え可
+      const alone = !c || c.areas.length === 1;
       return (
         <div
           className={`ta${linkFrom === o.id ? ' link-from' : ''}`}
@@ -762,7 +1022,26 @@ export function App() {
             textDecoration: d.underline ? 'underline' : undefined,
           }}
         >
-          <div className="ta-slice">{slice}</div>
+          <div
+            className="ta-slice"
+            style={
+              alone
+                ? {
+                    textAlign: d.halign,
+                    ...(d.valign === 'middle' || d.valign === 'bottom'
+                      ? {
+                          display: 'flex',
+                          flexDirection: 'column' as const,
+                          justifyContent:
+                            d.valign === 'middle' ? 'center' : 'flex-end',
+                        }
+                      : {}),
+                  }
+                : undefined
+            }
+          >
+            {slice}
+          </div>
           {overflow.length > 0 && (
             <div
               className="oflabel nodrag"
@@ -901,16 +1180,32 @@ export function App() {
               return;
             }
             const objEl = (e.target as HTMLElement).closest?.(
-              '[data-ki-obj]',
+              '[data-ki-obj],[data-id]',
             ) as HTMLElement | null;
-            const id = objEl?.dataset.kiObj;
-            const o = id
-              ? engine.doc.objects.find(
-                  (x) => x.id === id && x.kind !== PAGE_KIND,
-                )
+            const id = objEl?.dataset.kiObj ?? objEl?.dataset.id;
+            const cr = canvasRef.current!.getBoundingClientRect();
+            const domO = id
+              ? engine.doc.objects.find((x) => x.id === id)
               : undefined;
+            // .ki-shape は pointer-events:none で DOM を抜け、着地した
+            // ページ枠が拾われることがある — ページ以外の DOM 解決 →
+            // 幾何ヒット（hitFilter でページ除外済み）の順で解決
+            const o =
+              (domO && domO.kind !== PAGE_KIND ? domO : undefined) ??
+              engine.objectAt({
+                x: e.clientX - cr.left,
+                y: e.clientY - cr.top,
+              });
             if (!o) return;
-            if (!engine.selectedIds.has(o.id)) engine.setSelection([o.id]);
+            if (!engine.selectedIds.has(o.id)) {
+              engine.setSelection(
+                o.group
+                  ? engine.doc.objects
+                      .filter((x) => x.group === o.group)
+                      .map((x) => x.id)
+                  : [o.id],
+              );
+            }
             setCtxMenu({ x: e.clientX, y: e.clientY });
           }}
         >
@@ -925,7 +1220,7 @@ export function App() {
             selLink={selLink}
             onPick={setSelLink}
           />
-          {shapeTool && (
+          {shapeTool && shapeTool !== 'curve' && (
             <div
               className="shape-overlay"
               onPointerDown={(e) => {
@@ -1014,26 +1309,6 @@ export function App() {
                           },
                           data: {},
                         }
-                      : shapeTool === 'curve'
-                        ? {
-                            id,
-                            kind: 'curve',
-                            x,
-                            y,
-                            w,
-                            h,
-                            // ドラッグ領域に沿う浅い弧 — 生成後は頂点
-                            // グリップで形を整える（kimetron P48）
-                            shape: {
-                              points: [
-                                { fx: 0, fy: 0.5 },
-                                { fx: 0.5, fy: 0 },
-                                { fx: 1, fy: 0.5 },
-                              ],
-                            },
-                            style: { stroke: '#333333', width: MM_PX * 0.5 },
-                            data: {},
-                          }
                       : {
                           id,
                           kind: 'line',
@@ -1051,6 +1326,56 @@ export function App() {
                 setShapeTool(null);
               }}
             />
+          )}
+          {engine.shapeDraw && (
+            <svg
+              style={{
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                pointerEvents: 'none',
+                zIndex: 5,
+              }}
+            >
+              {(() => {
+                const g = engine.doc.grid;
+                const c = engine.cursorWorld;
+                const cur =
+                  g.snap && g.size > 0
+                    ? {
+                        x: Math.round(c.x / g.size) * g.size,
+                        y: Math.round(c.y / g.size) * g.size,
+                      }
+                    : c;
+                const pts = [...engine.shapeDraw.pts, cur].map((p) =>
+                  engine.worldToScreen(p),
+                );
+                return (
+                  <>
+                    <polyline
+                      points={pts.map((p) => `${p.x},${p.y}`).join(' ')}
+                      fill="none"
+                      stroke="#3a7bd5"
+                      strokeDasharray="4 3"
+                    />
+                    {engine.shapeDraw.pts.map((p, i) => {
+                      const s = engine.worldToScreen(p);
+                      return (
+                        <rect
+                          key={i}
+                          x={s.x - 3}
+                          y={s.y - 3}
+                          width={6}
+                          height={6}
+                          fill="#3a7bd5"
+                        />
+                      );
+                    })}
+                  </>
+                );
+              })()}
+            </svg>
           )}
           {shapeDrag && (
             <div
@@ -1117,6 +1442,7 @@ export function App() {
             )
           }
           onReorder={(op) => engine.reorderSelected(op)}
+          onAlign={onAlign}
           onDeselect={() => engine.setSelection([])}
           collapsed={dockCollapsed}
           onToggleDock={() => setDockCollapsed((v) => !v)}
@@ -1190,6 +1516,10 @@ export function App() {
             if (!c) return '';
             const lr = layouts.get(c.id);
             return lr?.slices.find((s) => s.areaId === o.id)?.text ?? '';
+          }}
+          areaAlone={(o) => {
+            const c = chainOf(chains, o.id);
+            return !c || c.areas.length === 1;
           }}
           onPrint={() => window.print()}
           onClose={() => setPrinting(false)}
@@ -1324,6 +1654,27 @@ export function App() {
             >
               {t('z.back')}
             </button>
+            {selObjs.filter((o) => o.kind !== PAGE_KIND && !o.locked)
+              .length >= 2 && (
+              <button
+                onClick={() => {
+                  groupSelection();
+                  setCtxMenu(null);
+                }}
+              >
+                {t('ctx.group')}
+              </button>
+            )}
+            {selObjs.some((o) => o.group) && (
+              <button
+                onClick={() => {
+                  ungroupSelection();
+                  setCtxMenu(null);
+                }}
+              >
+                {t('ctx.ungroup')}
+              </button>
+            )}
               </>
             )}
           </div>
