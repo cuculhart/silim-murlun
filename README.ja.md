@@ -11,6 +11,8 @@ English: [README.md](README.md)
 
 ![文書編集画面](doc/screenshot.png)
 
+**[Live demo](https://cuculhart.github.io/silim-murlun/)** — インストール不要・ブラウザだけで動きます
+
 変更履歴は [CHANGELOG](CHANGELOG.md) を参照（最新: v0.6.0）。
 
 ## 機能
