@@ -2,6 +2,40 @@
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-10-29
+
+### English
+
+Paste/clipboard and print fixes.
+
+- Fixed: group IDs (`gN`) were numbered from a session-only counter, so
+  reopened documents could collide — pasted clones merged into an
+  unrelated existing group. New groups now skip IDs already in use,
+  and opening a file re-normalizes group IDs per page (same-name
+  groups on different pages are split and renumbered, healing
+  documents saved with collisions).
+- Fixed: Ctrl+V pasted the stale internal copy buffer even after
+  copying something else — all paste decisions moved to the `paste`
+  event: in-app copies write a marker to the OS clipboard
+  (synchronously via the `copy` event), and the marker decides whether
+  to paste internal objects, an external image, or nothing.
+- Fixed: an extra blank page printed after the last page —
+  `page-break-after: always` fired on the final `.ppage`.
+
+### 日本語
+
+コピペ/クリップボード・印刷まわりの修正。
+
+- 修正: グループID（gN）がセッション内連番のみで、再オープン後に
+  既存IDと衝突 → ペーストしたクローンが無関係の既存グループに
+  混入していた。新規採番は既存IDをスキップし、ファイルオープン時に
+  同名グループをページ単位で分割・連番化して汚染を修復
+- 修正: 外部で新しくコピーしても Ctrl+V が古い内部バッファを貼って
+  いた — ペースト判定を paste イベントに集約し、アプリ内コピーは
+  OS クリップボードへマーカーを書き込んで照合する方式に変更
+- 修正: 最終ページの後に白紙が1枚出力される —
+  最後の `.ppage` で改ページを抑止
+
 ## [0.8.0] - 2026-10-29
 
 ### English

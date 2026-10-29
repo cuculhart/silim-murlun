@@ -261,15 +261,15 @@ export function App() {
         return;
       }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
-        e.preventDefault();
+        // preventDefault しない — copy イベント側で同期的に
+        // マーカーを clipboardData.setData する（N-18 画像ペースト対策）
         copySel();
         return;
       }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
-        // preventDefault しない — するとブラウザの paste イベントが
-        // 発火せず画像貼り付け（N-18）が届かない。テキストエリア
-        // フォーカス中のネイティブ貼り付けも通す
-        pasteSel();
+        // ペースト処理はすべて paste イベント側で行う —
+        // clipboardData の中身（内部コピーのマーカーか、外部の
+        // 画像か）を見て振り分ける必要があるため
         return;
       }
       if (e.key === 'Enter' && engine.mode === 'shape') {
@@ -304,6 +304,19 @@ export function App() {
     window.addEventListener('keydown', onKey);
     // N-18: クリップボード画像 → 新規 image オブジェクト
     const onPaste = (e: ClipboardEvent) => {
+      const t = document.activeElement as HTMLElement | null;
+      const editable =
+        t && ['TEXTAREA', 'INPUT', 'SELECT'].includes(t.tagName);
+      const isMark =
+        e.clipboardData?.getData('text/plain') === CLIP_MARK;
+      if (isMark) {
+        // 内部コピー = 最新 — 入力欄ではマーカー文字列が挿入されない
+        // よう抑止し、キャンバスでは内部バッファを貼る
+        e.preventDefault();
+        if (!editable) pasteSel();
+        return;
+      }
+      if (editable) return; // 外部テキストのネイティブ貼り付けを通す
       const items = e.clipboardData?.items;
       if (!items) return;
       for (const it of items) {
@@ -337,9 +350,21 @@ export function App() {
         return;
       }
     };
+    // アプリ内コピー時は OS クリップボードへマーカーを書き込み、
+    // 残り物（画像等）が Ctrl+V で紛れ込まないようにする。
+    // copy イベントの setData は同期的なので確実に上書きされる
+    const onCopy = (e: ClipboardEvent) => {
+      const t = document.activeElement as HTMLElement | null;
+      if (t && ['TEXTAREA', 'INPUT', 'SELECT'].includes(t.tagName)) return;
+      if (!copyBuf.current.length) return;
+      e.clipboardData?.setData('text/plain', CLIP_MARK);
+      e.preventDefault();
+    };
+    window.addEventListener('copy', onCopy);
     window.addEventListener('paste', onPaste);
     return () => {
       window.removeEventListener('keydown', onKey);
+      window.removeEventListener('copy', onCopy);
       window.removeEventListener('paste', onPaste);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -555,7 +580,26 @@ export function App() {
     f.arrayBuffer()
       .then((buf) => {
         const r = unpackArchive(new Uint8Array(buf));
-        commitPages(r.model, r.objects);
+        // 過去バージョンで別グループへ同じ gN が振られて保存された
+        // 汚染を修復する — 同名グループをページ単位で分割し連番化
+        const prects = pageRects(r.model.spec, r.model.pages);
+        const gmap = new Map<string, string>();
+        let gn = 0;
+        const objects = r.objects.map((o) => {
+          if (!o.group) return o;
+          const cx = o.x + o.w / 2;
+          const cy = o.y + o.h / 2;
+          const pi = prects.findIndex(
+            (p) =>
+              cx >= p.x && cx < p.x + p.w && cy >= p.y && cy < p.y + p.h,
+          );
+          const key = `${o.group}@${pi}`;
+          let g = gmap.get(key);
+          if (!g) gmap.set(key, (g = `g${++gn}`));
+          return { ...o, group: g };
+        });
+        groupSeqRef.current = gn + 1;
+        commitPages(r.model, objects);
         setChains(r.chains);
         setFooter(r.footer);
         setDocTitle(r.title);
@@ -787,6 +831,14 @@ export function App() {
 
   // ── F25: 複製・コピー＆ペースト（テキストエリアは対象外） ──
   const groupSeqRef = useRef(1);
+  // 既存ドキュメント（書庫由来の gN を含む）と被らない新しいグループID
+  const freshGroup = () => {
+    const used = new Set(
+      engine.doc.objects.map((o) => o.group).filter(Boolean),
+    );
+    while (used.has(`g${groupSeqRef.current}`)) groupSeqRef.current++;
+    return `g${groupSeqRef.current++}`;
+  };
   const lastGroupClickRef = useRef<string | null>(null);
   const copyBuf = useRef<WorldObject[]>([]);
   const pasteN = useRef(0);
@@ -820,7 +872,7 @@ export function App() {
       if (o.group) {
         g = gmap.get(o.group);
         if (!g) {
-          g = `g${groupSeqRef.current++}`;
+          g = freshGroup();
           gmap.set(o.group, g);
         }
       }
@@ -864,6 +916,9 @@ export function App() {
     addClones(makeClones(srcs, s, s, freshIdGen()), srcs);
   };
   const copyText = useRef(new Map<string, string>());
+  // OS クリップボード側の残り物（画像等）が貼り付かないよう、
+  // アプリ内コピー時はマーカーを書き込んで上書きする
+  const CLIP_MARK = 'silim-murlun:copy';
   const copySel = () => {
     const srcs = dupSrcs();
     copyBuf.current = JSON.parse(JSON.stringify(srcs));
@@ -901,7 +956,7 @@ export function App() {
 
   // ── F26: グルーピング ──
   const groupSelection = () => {
-    const g = `g${groupSeqRef.current++}`;
+    const g = freshGroup();
     const sel = new Set(engine.selectedIds);
     engine.setDoc({
       ...engine.doc,
