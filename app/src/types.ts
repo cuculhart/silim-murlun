@@ -36,6 +36,8 @@ export interface TextAreaData {
   valign?: 'top' | 'middle' | 'bottom';
   /** 横揃え（単独エリアのみ有効 — 連鎖エリアは常に left） */
   halign?: 'left' | 'center' | 'right';
+  /** エリア全体の URL リンク（印刷/PDF で <a> 化） */
+  link?: string;
 }
 
 export const DEFAULT_TEXT_DATA: TextAreaData = {

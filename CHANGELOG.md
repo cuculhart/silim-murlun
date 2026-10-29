@@ -2,6 +2,64 @@
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-29
+
+### English
+
+Usability improvements (paste / scroll / paste position) plus text
+links, and remaining defect fixes.
+
+- Clipboard image paste (N-18): Ctrl+V places a clipboard image as a
+  new image object at the last click position (aspect ratio measured
+  and locked). Text paste intentionally out of scope.
+- Floating scroll UI (N-19): ▲▼ buttons at the canvas right edge for
+  vertical scrolling — an alternative to middle-button panning.
+- Paste at click position (N-20): Ctrl+V now places the copy's
+  bounding box top-left at the last canvas click (grid-snapped)
+  instead of offset below-right of the source.
+- Text links (N-17): apply a URL to a text selection
+  (`TextMark.attrs.link`, URL input in the chain pane, Enter to apply)
+  or to a whole area (`TextAreaData.link`). On canvas links render
+  blue+underline without navigating; print emits real `<a>` elements,
+  so "Save as PDF" keeps clickable links. Scheme-less input gets
+  `https://` prepended.
+
+### Fixed
+
+- B-8: page tags (p.N with +/× buttons) were invisible — `.ki-obj`'s
+  `overflow:hidden` clipped the tag floating above the frame.
+  `.ki-obj:has(.page-tag)` now allows `overflow:visible`.
+- Ctrl+V keydown called preventDefault, blocking the browser paste
+  event entirely — removed so clipboard image paste works.
+- Shape fills missing in printed output — Chrome drops backgrounds
+  when printing; `print-color-adjust: exact` on the printout keeps
+  fills/borders/transparency.
+
+### 日本語
+
+使い勝手の改善（ペースト・スクロール・貼り付け位置）＋
+テキストリンク、残不具合の消化。
+
+- クリップボードからの画像貼り付け（N-18）: Ctrl+V で画像を新規
+  image オブジェクトとして直近クリック位置へ配置（アスペクト比
+  自動算出・ロックON）。テキスト貼り付けは対象外
+- 上下スクロールUI（N-19）: キャンバス右端に ▲▼ フローティング
+  ボタン（ホイール押し込みパン不慣れ対策）
+- ペースト位置をクリック位置へ（N-20）: Ctrl+V の配置先を
+  「コピー元の右下」から直近クリック位置へ変更（グリッド吸着）
+- テキストのリンク（N-17）: 選択範囲への部分リンク
+  （`TextMark.attrs.link`）とエリア全体のリンク
+  （`TextAreaData.link`）。編集画面では遷移せず青+下線で表示のみ、
+  印刷は `<a>` で出すため「PDF に保存」でリンクが生きる
+  （Microsoft Print to PDF 経由ではリンクが落ちます）。
+  スキーム省略入力は `https://` を補完
+- 修正（B-8）: ページタグ（p.N＋＋/×ボタン）が表示されない —
+  `.ki-obj` の `overflow:hidden` で枠の上に出るタグが刈られていた
+- 修正: Ctrl+V の keydown で preventDefault していたため
+  paste イベントが届かず画像貼り付けが動かなかった
+- 修正: 印刷でシェイプの塗りが出ない — Chrome の背景省略を
+  `print-color-adjust: exact` で抑止
+
 ## [0.7.0] - 2026-10-29
 
 ### English

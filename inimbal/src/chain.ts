@@ -80,6 +80,8 @@ export interface TextAttrs {
   bold?: boolean;
   italic?: boolean;
   underline?: boolean;
+  /** URL リンク（印刷/PDF で <a> 化。編集画面では遷移しない） */
+  link?: string;
 }
 
 /** chain.text の [start,end) に効く書式マーク。後勝ち（属性単位の上書き） */

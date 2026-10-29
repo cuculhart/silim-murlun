@@ -223,23 +223,40 @@ export function Printout({
                         : {}),
                     }}
                   >
-                    {sliceRuns(o).map((r, i) => (
-                      <span
-                        key={i}
-                        style={{
-                          fontSize: `${r.attrs.fontSize ?? d.fontSize}mm`,
-                          fontFamily: r.attrs.fontFamily,
-                          color: r.attrs.color ?? d.color,
-                          fontWeight: r.attrs.bold ? 'bold' : undefined,
-                          fontStyle: r.attrs.italic ? 'italic' : undefined,
-                          textDecoration: r.attrs.underline
-                            ? 'underline'
-                            : undefined,
-                        }}
-                      >
-                        {r.text}
-                      </span>
-                    ))}
+                    {sliceRuns(o).map((r, i) => {
+                      const span = (
+                        <span
+                          style={{
+                            fontSize: `${r.attrs.fontSize ?? d.fontSize}mm`,
+                            fontFamily: r.attrs.fontFamily,
+                            color: r.attrs.link
+                              ? '#1a56c4'
+                              : (r.attrs.color ?? d.color),
+                            fontWeight: r.attrs.bold ? 'bold' : undefined,
+                            fontStyle: r.attrs.italic ? 'italic' : undefined,
+                            textDecoration:
+                              r.attrs.underline || r.attrs.link
+                                ? 'underline'
+                                : undefined,
+                          }}
+                        >
+                          {r.text}
+                        </span>
+                      );
+                      // 印刷は <a> で出す → PDF 書き出しでリンクが生きる
+                      return r.attrs.link ? (
+                        <a
+                          key={i}
+                          href={r.attrs.link}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {span}
+                        </a>
+                      ) : (
+                        <span key={i}>{span}</span>
+                      );
+                    })}
                   </div>
                 );
               }

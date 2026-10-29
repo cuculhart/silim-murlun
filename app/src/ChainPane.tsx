@@ -150,6 +150,20 @@ export function ChainPane({
             </option>
           ))}
         </select>
+        <input
+          className="chain-marks-link"
+          type="url"
+          disabled={!hasSel}
+          placeholder={t('chain.markLink')}
+          onKeyDown={(e) => {
+            const v = e.currentTarget.value.trim();
+            if (e.key === 'Enter' && v) {
+              // スキーム省略は https 補完（PDFのリンク注釈化に必要）
+              apply({ link: /^[a-z]+:/i.test(v) ? v : `https://${v}` });
+              e.currentTarget.value = '';
+            }
+          }}
+        />
         <button
           disabled={!hasSel}
           onClick={() => onClearMarks(sel.s, sel.e)}
@@ -224,6 +238,23 @@ export function ChainPane({
               onChange={(e) =>
                 onAreaData({ underline: e.currentTarget.checked })
               }
+            />
+          </label>
+          <label>
+            {t('chain.areaLink')}
+            <input
+              type="url"
+              className="chain-area-link"
+              value={areaData.link ?? ''}
+              placeholder="https://…"
+              onChange={(e) =>
+                onAreaData({ link: e.currentTarget.value || undefined })
+              }
+              onBlur={(e) => {
+                const v = e.currentTarget.value.trim();
+                if (v && !/^[a-z]+:/i.test(v))
+                  onAreaData({ link: `https://${v}` });
+              }}
             />
           </label>
         </div>

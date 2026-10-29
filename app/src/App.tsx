@@ -266,7 +266,9 @@ export function App() {
         return;
       }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
-        e.preventDefault();
+        // preventDefault しない — するとブラウザの paste イベントが
+        // 発火せず画像貼り付け（N-18）が届かない。テキストエリア
+        // フォーカス中のネイティブ貼り付けも通す
         pasteSel();
         return;
       }
@@ -300,7 +302,46 @@ export function App() {
       }
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    // N-18: クリップボード画像 → 新規 image オブジェクト
+    const onPaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const it of items) {
+        if (!it.type.startsWith('image/')) continue;
+        const file = it.getAsFile();
+        if (!file) continue;
+        e.preventDefault();
+        const rd = new FileReader();
+        rd.onload = () => {
+          const url = rd.result as string;
+          const img = new Image();
+          img.onload = () => {
+            const aspect = img.naturalHeight / img.naturalWidth;
+            const w = Math.min(100, img.naturalWidth / MM_PX);
+            const p = lastClickRef.current ?? { x: 30, y: 30 };
+            const id = nextId('im');
+            engine.addObject({
+              id,
+              kind: IMG_KIND,
+              x: p.x,
+              y: p.y,
+              w,
+              h: w * aspect,
+              data: { url, aspect, lock: true } satisfies ImageData,
+            });
+            engine.setSelection([id]);
+          };
+          img.src = url;
+        };
+        rd.readAsDataURL(file);
+        return;
+      }
+    };
+    window.addEventListener('paste', onPaste);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('paste', onPaste);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine, selLink, docTitle]);
 
@@ -836,10 +877,26 @@ export function App() {
     );
     pasteN.current = 0;
   };
+  // N-20: 直近のキャンバスクリック位置（world座標）— ペーストの配置先
+  const lastClickRef = useRef<{ x: number; y: number } | null>(null);
   const pasteSel = () => {
     if (!copyBuf.current.length) return;
-    const s = gridStep() * ++pasteN.current;
-    addClones(makeClones(copyBuf.current, s, s, freshIdGen()), copyBuf.current);
+    const p = lastClickRef.current;
+    let dx: number;
+    let dy: number;
+    if (p) {
+      // コピー範囲の左上角をクリック位置へ（グリッド吸着）
+      const minX = Math.min(...copyBuf.current.map((o) => o.x));
+      const minY = Math.min(...copyBuf.current.map((o) => o.y));
+      const gs = gridStep();
+      dx = Math.round((p.x - minX) / gs) * gs;
+      dy = Math.round((p.y - minY) / gs) * gs;
+    } else {
+      const s = gridStep() * ++pasteN.current;
+      dx = s;
+      dy = s;
+    }
+    addClones(makeClones(copyBuf.current, dx, dy, freshIdGen()), copyBuf.current);
   };
 
   // ── F26: グルーピング ──
@@ -1033,6 +1090,7 @@ export function App() {
         bold: d.bold,
         italic: d.italic,
         underline: d.underline,
+        link: d.link,
       });
       const isLast = c ? c.areas[c.areas.length - 1] === o.id : false;
       const overflow = isLast ? (lr?.overflow ?? '') : '';
@@ -1073,13 +1131,18 @@ export function App() {
             {runs.map((r, i) => (
               <span
                 key={i}
+                title={r.attrs.link}
                 style={{
                   fontSize: r.attrs.fontSize! * MM_PX * z,
                   fontFamily: r.attrs.fontFamily,
-                  color: r.attrs.color,
+                  // リンクは編集画面では遷移させず色+下線で表現
+                  color: r.attrs.link ? '#1a56c4' : r.attrs.color,
                   fontWeight: r.attrs.bold ? 'bold' : undefined,
                   fontStyle: r.attrs.italic ? 'italic' : undefined,
-                  textDecoration: r.attrs.underline ? 'underline' : undefined,
+                  textDecoration:
+                    r.attrs.underline || r.attrs.link
+                      ? 'underline'
+                      : undefined,
                 }}
               >
                 {r.text}
@@ -1171,6 +1234,14 @@ export function App() {
             // 中ボタンドラッグの既定動作（オートスクロール）を抑止し、
             // kimetron のパン操作だけにする
             if (e.button === 1) e.preventDefault();
+            // N-20: ペースト配置先のためクリック位置を world 座標で記憶
+            if (e.button === 0) {
+              const r = canvasRef.current!.getBoundingClientRect();
+              lastClickRef.current = engine.screenToWorld({
+                x: e.clientX - r.left,
+                y: e.clientY - r.top,
+              });
+            }
           }}
           onPointerMove={(e) => {
             if (!placingRef.current) return;
@@ -1451,6 +1522,31 @@ export function App() {
             onGo={goToPage}
             t={t}
           />
+          {/* N-19: 上下スクロール（ホイールパン不慣れ対策のフローティングUI） */}
+          <div className="scroll-nav">
+            <button
+              title={t('scroll.up')}
+              onClick={() => {
+                const el = canvasRef.current;
+                if (!el) return;
+                engine.viewport.y += el.clientHeight * 0.6;
+                engine.panBy(0, 0);
+              }}
+            >
+              ▲
+            </button>
+            <button
+              title={t('scroll.down')}
+              onClick={() => {
+                const el = canvasRef.current;
+                if (!el) return;
+                engine.viewport.y -= el.clientHeight * 0.6;
+                engine.panBy(0, 0);
+              }}
+            >
+              ▼
+            </button>
+          </div>
           {placing && ghost && (
             <div
               className="img-ghost"
@@ -1601,6 +1697,7 @@ export function App() {
               bold: d.bold,
               italic: d.italic,
               underline: d.underline,
+              link: d.link,
             });
           }}
           areaAlone={(o) => {

@@ -227,6 +227,12 @@ body,
   box-shadow: 0 1px 4px var(--shadow);
 }
 
+/* B-8: ページタグは top:-1.7em で枠の上に出るため、
+   ki-obj の overflow:hidden に刈られないよう枠だけ可視化する */
+.ki-obj:has(.page-tag) {
+  overflow: visible;
+}
+
 .page-tag {
   position: absolute;
   top: -1.7em;
@@ -252,6 +258,35 @@ body,
 
 .page-tag button:hover {
   background: var(--bg);
+}
+
+/* N-19: 上下スクロール用フローティングUI */
+.scroll-nav {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 30;
+}
+
+.scroll-nav button {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 15px;
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+.scroll-nav button:hover {
+  background: var(--bg);
+  opacity: 1;
 }
 
 /* アクティブページ（枠クリックで選択・削除/ナビの対象） */
@@ -456,6 +491,14 @@ body,
 
 .chain-marks-font {
   width: 90px;
+}
+
+.chain-marks-link {
+  width: 110px;
+}
+
+.chain-area-link {
+  width: 140px;
 }
 
 .chain-font {
@@ -974,6 +1017,13 @@ body,
 }
 
 @media print {
+  /* Chrome 既定では背景色・塗りが印刷で省略されるため、
+     色調整を強制して塗り・枠線・グリッドをそのまま出す（継承される） */
+  .printout {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
   html,
   body,
   #root,
