@@ -157,7 +157,11 @@ describe('途中挿入・削除', () => {
 });
 
 describe('部分装飾マーク', () => {
-  const mk = (start: number, end: number, attrs = { bold: true }) => ({
+  const mk = (
+    start: number,
+    end: number,
+    attrs: import('../src/chain').TextAttrs = { bold: true },
+  ) => ({
     start,
     end,
     attrs,
