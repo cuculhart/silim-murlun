@@ -420,6 +420,44 @@ body,
   border-top: 1px solid var(--line);
 }
 
+.chain-marks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+}
+
+.chain-marks button,
+.chain-marks select,
+.chain-marks input {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 12px;
+  padding: 1px 6px;
+}
+
+.chain-marks button:disabled,
+.chain-marks select:disabled,
+.chain-marks input:disabled {
+  opacity: 0.45;
+}
+
+.chain-marks input[type='color'] {
+  padding: 0 2px;
+  width: 26px;
+  height: 22px;
+}
+
+.chain-marks-font {
+  width: 90px;
+}
+
 .chain-font {
   display: flex;
   flex-wrap: wrap;
@@ -436,11 +474,16 @@ body,
   align-items: center;
 }
 
-.chain-font select {
+.chain-font select,
+.chain-font input {
   background: var(--surface);
   color: var(--text);
   border: 1px solid var(--line);
   border-radius: 4px;
+}
+
+.chain-font-family {
+  width: 120px;
 }
 
 .chain-links {

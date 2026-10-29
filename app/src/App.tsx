@@ -4,9 +4,12 @@ import { IsleCanvas, useEngine, useEngineVersion } from '@kimetron/react';
 import { formatLength, type Engine, type WorldObject } from '@kimetron/core';
 import {
   addPage,
+  adjustMarksForEdit,
+  applyMark,
   applyVerticalShift,
   canLink,
   chainOf,
+  clearMarksIn,
   createPages,
   deletePage,
   insertPage,
@@ -15,11 +18,13 @@ import {
   pageRects,
   pruneChains,
   setPaper,
+  sliceRuns,
   unlinkAt,
   type Chain,
   type LayoutResult,
   type PageModel,
   type PaperSize,
+  type TextAttrs,
 } from 'inimbal';
 import { RightDock } from './Inspector';
 import { LinkWires, type LinkSel } from './LinkWires';
@@ -140,6 +145,7 @@ export function App() {
   const createdAtRef = useRef(new Date().toISOString());
   const dirtyRef = useRef(false);
   const applyingRef = useRef(false);
+  const [docFont, setDocFont] = useState('sans-serif');
   type Snap = {
     objects: WorldObject[];
     chains: Chain[];
@@ -147,6 +153,7 @@ export function App() {
     footer: boolean;
     title: string;
     pageOpacity: number;
+    docFont: string;
   };
   const histRef = useRef<{ past: Snap[]; future: Snap[]; last: number }>({
     past: [],
@@ -350,6 +357,7 @@ export function App() {
     footer,
     title: docTitle,
     pageOpacity,
+    docFont,
   });
   const applySnap = (s: Snap) => {
     applyingRef.current = true;
@@ -366,6 +374,7 @@ export function App() {
     setFooter(s.footer);
     setDocTitle(s.title);
     setPageOpacity(s.pageOpacity);
+    setDocFont(s.docFont);
     snapRef.current = s;
     applyingRef.current = false;
   };
@@ -405,7 +414,7 @@ export function App() {
     }
     snapRef.current = makeSnap();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engine.doc.objects, chains, model, footer, docTitle, pageOpacity]);
+  }, [engine.doc.objects, chains, model, footer, docTitle, pageOpacity, docFont]);
 
   // 未保存変更があるときの離脱警告
   useEffect(() => {
@@ -467,6 +476,7 @@ export function App() {
     setFooter(true);
     setDocTitle('');
     setPageOpacity(50);
+    setDocFont('sans-serif');
     createdAtRef.current = new Date().toISOString();
     dirtyRef.current = false;
     engine.setSelection([]);
@@ -482,6 +492,7 @@ export function App() {
       title: docTitle,
       createdAt: createdAtRef.current,
       pageOpacity,
+      docFont,
     });
     const a = document.createElement('a');
     const url = URL.createObjectURL(
@@ -508,6 +519,7 @@ export function App() {
         setFooter(r.footer);
         setDocTitle(r.title);
         setPageOpacity(r.pageOpacity);
+        setDocFont(r.docFont ?? 'sans-serif');
         createdAtRef.current = r.createdAt || new Date().toISOString();
         dirtyRef.current = false;
         engine.setSelection([]);
@@ -517,7 +529,13 @@ export function App() {
   };
 
   // ── テキストエリア生成（用紙上ダブルクリック） ──
+  // B-1: ナビクリック→スクロールでカーソル下にページが来て
+  // 2クリック目+ダブルクリック判定がキャンバスへ着弾するのを抑止。
+  // ページ切替後の短い間はエリア生成ダブルクリックを無効化する。
+  const suppressDblUntil = useRef(0);
+
   const onDblClick = (e: React.MouseEvent) => {
+    if (performance.now() < suppressDblUntil.current) return;
     if (linkModeRef.current || placingRef.current) return;
     if (engine.mode === 'shape') {
       commitCurve();
@@ -559,7 +577,7 @@ export function App() {
       w: 60,
       h: 45,
       style: { stroke: 'rgba(90,110,140,0.4)' },
-      data: { ...DEFAULT_TEXT_DATA },
+      data: { ...DEFAULT_TEXT_DATA, fontFamily: docFont },
     });
     setChains((cs) => [
       ...cs,
@@ -927,7 +945,10 @@ export function App() {
         },
       ];
     });
-    layouts.set(c.id, layoutChain(c.text, boxes, measurerRef.current));
+    layouts.set(
+      c.id,
+      layoutChain(c.text, boxes, measurerRef.current, c.marks),
+    );
   }
 
   // 右ペインの駆動源（選択オブジェクト配列）
@@ -943,6 +964,7 @@ export function App() {
   // G1+G2: ページ全体が収まる倍率に調整し、ページ左上（ルーラー原点）を
   // キャンバス左上（ルーラー帯分の余白込み）に合わせる
   const focusPage = (i: number, mdl: PageModel = model) => {
+    suppressDblUntil.current = performance.now() + 700;
     setActivePage(i);
     const el = canvasRef.current;
     const p = pageRects(mdl.spec, mdl.pages)[i];
@@ -1003,7 +1025,15 @@ export function App() {
       const d = { ...DEFAULT_TEXT_DATA, ...(o.data as TextAreaData) };
       const c = chainOf(chains, o.id);
       const lr = c ? layouts.get(c.id) : undefined;
-      const slice = lr?.slices.find((s) => s.areaId === o.id)?.text ?? '';
+      const sl = lr?.slices.find((s) => s.areaId === o.id);
+      const runs = sliceRuns(sl?.text ?? '', c?.marks, sl?.offset ?? 0, {
+        fontSize: d.fontSize,
+        fontFamily: d.fontFamily,
+        color: d.color,
+        bold: d.bold,
+        italic: d.italic,
+        underline: d.underline,
+      });
       const isLast = c ? c.areas[c.areas.length - 1] === o.id : false;
       const overflow = isLast ? (lr?.overflow ?? '') : '';
       // リンク連鎖（複数エリア）は左上起点固定。単独エリアのみ揃え可
@@ -1040,7 +1070,21 @@ export function App() {
                 : undefined
             }
           >
-            {slice}
+            {runs.map((r, i) => (
+              <span
+                key={i}
+                style={{
+                  fontSize: r.attrs.fontSize! * MM_PX * z,
+                  fontFamily: r.attrs.fontFamily,
+                  color: r.attrs.color,
+                  fontWeight: r.attrs.bold ? 'bold' : undefined,
+                  fontStyle: r.attrs.italic ? 'italic' : undefined,
+                  textDecoration: r.attrs.underline ? 'underline' : undefined,
+                }}
+              >
+                {r.text}
+              </span>
+            ))}
           </div>
           {overflow.length > 0 && (
             <div
@@ -1429,7 +1473,33 @@ export function App() {
           }
           onChainText={(text) =>
             setChains((cs) =>
-              cs.map((c) => (c.id === selChain!.id ? { ...c, text } : c)),
+              cs.map((c) =>
+                c.id === selChain!.id
+                  ? {
+                      ...c,
+                      text,
+                      marks: adjustMarksForEdit(c.marks, c.text, text),
+                    }
+                  : c,
+              ),
+            )
+          }
+          onApplyMark={(s, e, attrs) =>
+            setChains((cs) =>
+              cs.map((c) =>
+                c.id === selChain!.id
+                  ? { ...c, marks: applyMark(c.marks, s, e, attrs) }
+                  : c,
+              ),
+            )
+          }
+          onClearMarks={(s, e) =>
+            setChains((cs) =>
+              cs.map((c) =>
+                c.id === selChain!.id
+                  ? { ...c, marks: clearMarksIn(c.marks, s, e) }
+                  : c,
+              ),
             )
           }
           onAreaData={(patch) => selObj && patchAreaData(selObj.id, patch)}
@@ -1494,6 +1564,8 @@ export function App() {
             onFooter: setFooter,
             pageOpacity,
             onOpacity: setPageOpacity,
+            font: docFont,
+            onFont: setDocFont,
           }}
           t={t}
         />
@@ -1515,11 +1587,21 @@ export function App() {
           model={model}
           footer={footer}
           objects={engine.doc.objects}
-          sliceText={(o) => {
+          sliceRuns={(o) => {
             const c = chainOf(chains, o.id);
-            if (!c) return '';
+            if (!c) return [];
             const lr = layouts.get(c.id);
-            return lr?.slices.find((s) => s.areaId === o.id)?.text ?? '';
+            const sl = lr?.slices.find((s) => s.areaId === o.id);
+            if (!sl) return [];
+            const d = { ...DEFAULT_TEXT_DATA, ...(o.data as TextAreaData) };
+            return sliceRuns(sl.text, c.marks, sl.offset, {
+              fontSize: d.fontSize,
+              fontFamily: d.fontFamily,
+              color: d.color,
+              bold: d.bold,
+              italic: d.italic,
+              underline: d.underline,
+            });
           }}
           areaAlone={(o) => {
             const c = chainOf(chains, o.id);

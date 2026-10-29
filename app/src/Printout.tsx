@@ -7,7 +7,7 @@ import {
   renderOrder,
   type WorldObject,
 } from '@kimetron/core';
-import { pageRects, type PageModel } from 'inimbal';
+import { pageRects, type PageModel, type TextRun } from 'inimbal';
 import {
   DEFAULT_TEXT_DATA,
   IMG_KIND,
@@ -29,7 +29,7 @@ export function Printout({
   model,
   footer,
   objects,
-  sliceText,
+  sliceRuns,
   areaAlone,
   onPrint,
   onClose,
@@ -38,8 +38,8 @@ export function Printout({
   model: PageModel;
   footer: boolean;
   objects: WorldObject[];
-  /** テキストエリア → 表示中スライス（連鎖レイアウト済み） */
-  sliceText: (o: WorldObject) => string;
+  /** テキストエリア → 表示中スライスのラン列（連鎖レイアウト＋装飾解決済み） */
+  sliceRuns: (o: WorldObject) => TextRun[];
   /** 単独（非連鎖）テキストエリアか — 揃えは単独のみ有効 */
   areaAlone: (o: WorldObject) => boolean;
   onPrint: () => void;
@@ -97,7 +97,7 @@ export function Printout({
                       height: `${o.h}mm`,
                       background: o.style?.fill,
                       border: o.style?.stroke
-                        ? `${wMm}mm solid ${o.style.stroke}`
+                        ? `${wMm}mm ${o.style.dash ? (o.style.dash[0] <= 2 ? 'dotted' : 'dashed') : 'solid'} ${o.style.stroke}`
                         : 'none',
                       borderRadius: o.kind === 'ellipse' ? '50%' : undefined,
                     }}
@@ -223,7 +223,23 @@ export function Printout({
                         : {}),
                     }}
                   >
-                    <span style={{ color: d.color }}>{sliceText(o)}</span>
+                    {sliceRuns(o).map((r, i) => (
+                      <span
+                        key={i}
+                        style={{
+                          fontSize: `${r.attrs.fontSize ?? d.fontSize}mm`,
+                          fontFamily: r.attrs.fontFamily,
+                          color: r.attrs.color ?? d.color,
+                          fontWeight: r.attrs.bold ? 'bold' : undefined,
+                          fontStyle: r.attrs.italic ? 'italic' : undefined,
+                          textDecoration: r.attrs.underline
+                            ? 'underline'
+                            : undefined,
+                        }}
+                      >
+                        {r.text}
+                      </span>
+                    ))}
                   </div>
                 );
               }

@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
+  adjustMarksForEdit,
+  applyMark,
   canLink,
   chainOf,
+  clearMarksIn,
   insertArea,
   layoutChain,
   linkChains,
   pruneChains,
   removeArea,
+  sliceRuns,
   unlinkAt,
   type Chain,
 } from '../src/chain';
@@ -29,8 +33,8 @@ describe('layoutChain', () => {
       meas,
     );
     expect(r.slices).toEqual([
-      { areaId: 'a', text: 'abcdef' },
-      { areaId: 'b', text: 'ghi' },
+      { areaId: 'a', text: 'abcdef', offset: 0 },
+      { areaId: 'b', text: 'ghi', offset: 6 },
     ]);
     expect(r.overflow).toBe('j');
   });
@@ -111,7 +115,7 @@ describe('unlinkAt — 切断時の巻き戻し', () => {
     );
     expect(out).toEqual([
       { id: 'c', areas: ['a'], text: 'xyz' },
-      { id: 'c2', areas: ['b', 'c'], text: '' },
+      { id: 'c2', areas: ['b', 'c'], text: '', marks: [] },
     ]);
   });
 
@@ -149,5 +153,146 @@ describe('途中挿入・削除', () => {
     ];
     const out = pruneChains(cs, (id) => id !== 'b' && id !== 'd');
     expect(out).toEqual([{ id: 'c1', areas: ['a', 'c'], text: 't1' }]);
+  });
+});
+
+describe('部分装飾マーク', () => {
+  const mk = (start: number, end: number, attrs = { bold: true }) => ({
+    start,
+    end,
+    attrs,
+  });
+
+  it('applyMark: 範囲へマーク追加。空・逆順は正規化/無視', () => {
+    expect(applyMark(undefined, 2, 5, { bold: true })).toEqual([
+      mk(2, 5),
+    ]);
+    expect(applyMark([mk(0, 3)], 8, 4, { italic: true })).toEqual([
+      mk(0, 3),
+      { start: 4, end: 8, attrs: { italic: true } },
+    ]);
+    expect(applyMark([mk(0, 3)], 5, 5, { bold: true })).toEqual([mk(0, 3)]);
+  });
+
+  it('clearMarksIn: 交差マークを除去・跨ぎマークは分割', () => {
+    const ms = [mk(0, 4), mk(3, 8, { italic: true }), mk(10, 12)];
+    // [3,6) を消す → mk(0,4) は [0,3) へ縮小、mk(3,8) は [6,8) へ残る
+    expect(clearMarksIn(ms, 3, 6)).toEqual([
+      mk(0, 3),
+      { start: 6, end: 8, attrs: { italic: true } },
+      mk(10, 12),
+    ]);
+  });
+
+  it('adjustMarksForEdit: 挿入で後続シフト・削除で交差部縮小', () => {
+    const ms = [mk(2, 5), mk(8, 10)];
+    // pos3 に "XX" 挿入 → 前者は [2,3)+[3,5)…内部に挿入なのでそのまま?
+    // 仕様: 挿入点がマーク内部 → マークは拡張しない（開始<=p・終了>=delEnd で p 側へ寄る）
+    const ins = adjustMarksForEdit(ms, 'abcdefghij', 'abcXXdefghij');
+    // delStart=3, delEnd=3, insLen=2 → delta=+2
+    // mk(2,5): start<=3→2, end>=3→7 に拡張（挿入分を内包）
+    expect(ins).toEqual([mk(2, 7), mk(10, 12)]);
+    // pos4-5("ef")削除 → mk(2,5) は [2,4) へ縮小、mk(8,10) → [6,8)
+    const del = adjustMarksForEdit(ms, 'abcdefghij', 'abcdghij');
+    expect(del).toEqual([mk(2, 4), mk(6, 8)]);
+  });
+
+  it('adjustMarksForEdit: 編集で完全に消えたマークは落ちる', () => {
+    const ms = [mk(2, 5)];
+    // pos1-8 を "Z" に置換 → マークは [1,1) 空で消える
+    expect(
+      adjustMarksForEdit(ms, 'abcdefghij', 'aZij'),
+    ).toEqual([]);
+  });
+
+  it('linkChains: to 側マークを継ぎ目分シフトして引き継ぐ', () => {
+    const cs: Chain[] = [
+      { id: 'c1', areas: ['a'], text: 'abc', marks: [mk(0, 2)] },
+      {
+        id: 'c2',
+        areas: ['b'],
+        text: 'de',
+        marks: [{ start: 0, end: 1, attrs: { italic: true } }],
+      },
+    ];
+    const out = linkChains(cs, 'a', 'b');
+    // joinTexts で '\n' が1字入る → offset=4
+    expect(out[0].text).toBe('abc\nde');
+    expect(out[0].marks).toEqual([
+      mk(0, 2),
+      { start: 4, end: 5, attrs: { italic: true } },
+    ]);
+  });
+
+  it('linkChains: 空テキスト側は継ぎ改行なしでオフセット0相当', () => {
+    const cs: Chain[] = [
+      { id: 'c1', areas: ['a'], text: 'abc', marks: [mk(0, 2)] },
+      { id: 'c2', areas: ['b'], text: '', marks: [mk(0, 0)] },
+    ];
+    const out = linkChains(cs, 'a', 'b');
+    expect(out[0].text).toBe('abc');
+  });
+
+  it('unlinkAt: テキストは head へ残りマーク維持・tail は空', () => {
+    const cs: Chain[] = [
+      { id: 'c', areas: ['a', 'b'], text: 'abcdef', marks: [mk(0, 6)] },
+    ];
+    const out = unlinkAt(cs, 'c', 0, 'c2');
+    expect(out[0].text).toBe('abcdef');
+    expect(out[0].marks).toEqual([mk(0, 6)]);
+    expect(out[1].text).toBe('');
+    expect(out[1].marks).toEqual([]);
+  });
+
+  it('sliceRuns: マークなしは base のみ1ラン', () => {
+    expect(sliceRuns('abc', undefined, 0, { fontSize: 4 })).toEqual([
+      { text: 'abc', attrs: { fontSize: 4 } },
+    ]);
+  });
+
+  it('sliceRuns: 範囲をまたぐマークを境界で分割・後勝ちマージ', () => {
+    const runs = sliceRuns(
+      'abcdef',
+      [mk(1, 4), { start: 3, end: 5, attrs: { color: '#f00' } }],
+      0,
+      { fontSize: 4 },
+    );
+    expect(runs).toEqual([
+      { text: 'a', attrs: { fontSize: 4 } },
+      { text: 'bc', attrs: { fontSize: 4, bold: true } },
+      { text: 'd', attrs: { fontSize: 4, bold: true, color: '#f00' } },
+      { text: 'e', attrs: { fontSize: 4, color: '#f00' } },
+      { text: 'f', attrs: { fontSize: 4 } },
+    ]);
+  });
+
+  it('sliceRuns: offset 付き（スライスが連鎖途中）で正しく切れる', () => {
+    // chain text "0123456789", slice は offset=5 の "56789"
+    const runs = sliceRuns('56789', [mk(6, 8)], 5, { fontSize: 4 });
+    expect(runs).toEqual([
+      { text: '5', attrs: { fontSize: 4 } },
+      { text: '67', attrs: { fontSize: 4, bold: true } },
+      { text: '89', attrs: { fontSize: 4 } },
+    ]);
+  });
+
+  it('layoutChain: marks を計測へ textOffset 付きで渡す', () => {
+    const seen: { off?: number; len?: number }[] = [];
+    const m = {
+      fit: (t: string, b: { textOffset?: number; marks?: unknown[] }) => {
+        seen.push({ off: b.textOffset, len: b.marks?.length });
+        return Math.min(t.length, 3);
+      },
+    };
+    layoutChain(
+      'abcdefgh',
+      [{ id: 'a', width: 3, height: 1 }, { id: 'b', width: 3, height: 1 }],
+      m,
+      [mk(0, 4)],
+    );
+    expect(seen).toEqual([
+      { off: 0, len: 1 },
+      { off: 3, len: 1 },
+    ]);
   });
 });

@@ -21,6 +21,7 @@ interface ArchiveDoc {
   chains: Chain[];
   footer: boolean;
   pageOpacity: number;
+  docFont?: string;
 }
 
 const EXT_OF_MIME: Record<string, string> = {
@@ -64,6 +65,7 @@ export function packArchive(input: {
   title: string;
   createdAt: string;
   pageOpacity: number;
+  docFont?: string;
 }): Uint8Array {
   const files: Record<string, Uint8Array> = {};
   let imgN = 0;
@@ -87,6 +89,7 @@ export function packArchive(input: {
     chains: input.chains,
     footer: input.footer,
     pageOpacity: input.pageOpacity,
+    docFont: input.docFont,
   };
   files['doc.json'] = strToU8(JSON.stringify(doc));
   return zipSync(files);
@@ -101,6 +104,7 @@ export function unpackArchive(bytes: Uint8Array): {
   title: string;
   createdAt: string;
   pageOpacity: number;
+  docFont?: string;
 } {
   const files = unzipSync(bytes);
   const raw = files['doc.json'];
@@ -129,5 +133,6 @@ export function unpackArchive(bytes: Uint8Array): {
     title: doc.title ?? '',
     createdAt: doc.createdAt ?? '',
     pageOpacity: doc.pageOpacity ?? 100,
+    docFont: doc.docFont,
   };
 }

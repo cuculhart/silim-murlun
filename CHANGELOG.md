@@ -2,6 +2,68 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-29
+
+### English
+
+Partial text decoration plus font support. kimetron updated to 1.6.1
+(`.ki-obj` border honors `style.dash`).
+
+- Partial text decoration (N-7): a toolbar in the chain pane applies
+  B/I/U, text color, size, and font family to the selected text range.
+  `Chain.marks` (range-scoped formatting) is new — measurement (per-run
+  font switching; line height = max fontSize in the line), rendering,
+  and print all work per run. Marks survive text edits and chain
+  link/unlink (coordinates are kept). "Clear marks" removes marks in
+  the range.
+- Document default font: the paper properties pane gains a "Default
+  font" field; newly created text areas inherit it. Stored in the
+  archive and in undo snapshots.
+- Installed font enumeration: `queryLocalFonts` (Chromium) feeds the
+  font selects (single/multi selection, mark toolbar, paper props).
+  Falls back to the preset list when unavailable or denied.
+- Rect/ellipse border line style (N-8): solid/dashed/dotted — the
+  border style is honored on canvas (kimetron 1.6.1 `.ki-obj`
+  borderStyle mapping) and in print.
+
+### Fixed
+
+- B-1: stray text areas appeared behind the page when navigating —
+  after a nav click the page scrolled under the cursor and the second
+  click landed on the canvas as a synthesized dblclick. Area-creation
+  dblclicks are now suppressed for 700ms after a page switch.
+- Mark color tool showed the previously picked color rather than the
+  selection's actual color, and confirming with Enter applied nothing.
+  The color input now syncs to the effective color at the selection
+  and applies its shown value on focus.
+
+### 日本語
+
+テキストの部分装飾＋フォント対応。kimetron は 1.6.1 へ更新
+（`.ki-obj` 枠線が `style.dash` に対応）。
+
+- テキストの部分装飾（N-7）: 連鎖ペインのツールバーで選択範囲へ
+  B/I/U・文字色・サイズ・書体を適用。`Chain.marks`（範囲指定書式）を
+  新設し、計測（ラン単位のフォント切替・行高さ=行内最大 fontSize）・
+  描画・印刷をラン対応化。テキスト編集・連鎖結合/切断でマーク座標を
+  維持。「装飾を解除」で範囲内マーク除去
+- ドキュメント既定フォント: 用紙プロパティに「既定フォント」欄を
+  追加。新規作成されるテキストエリアへ自動適用。書庫・Undo
+  スナップショットに含まれる
+- インストール済みフォントの列挙: `queryLocalFonts`（Chromium）で
+  ファミリをセレクト候補化（単一/複数選択・部分装飾・用紙プロパティの
+  全フォント欄）。非対応・拒否時は既定リストにフォールバック
+- 矩形・楕円の枠線の線種（N-8）: 実線/破線/点線を選択可。
+  画面は kimetron 1.6.1 の `.ki-obj` borderStyle 写像、印刷は
+  border-style で再現
+- 修正（B-1）: ページ送り時に稀に背面へテキストエリアが追加される。
+  ナビクリック→スクロールで2クリック目+ダブルクリック判定が
+  キャンバスへ着弾していた。ページ切替後 700ms はエリア生成
+  ダブルクリックを無効化
+- 修正: 部分装飾の色ツールが前回選択色を表示し Enter 確定で
+  適用されない不具合 — 選択位置の実効色へ同期し、
+  フォーカス時に表示色を適用するよう変更
+
 ## [0.6.0] - 2026-10-28
 
 ### English

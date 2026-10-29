@@ -9,18 +9,13 @@ import {
   type WorldObject,
   type ZOrder,
 } from '@kimetron/core';
-import type { Chain } from 'inimbal';
+import type { Chain, TextAttrs } from 'inimbal';
 import type { TFunc } from './i18n';
 import { tf } from './i18n';
 import { ChainPane } from './ChainPane';
 import type { ImageData, TextAreaData } from './types';
-import {
-  FONT_FAMILIES,
-  FONT_SIZES_MM,
-  IMG_KIND,
-  MM_PX,
-  TEXT_KIND,
-} from './types';
+import { FONT_SIZES_MM, IMG_KIND, MM_PX, TEXT_KIND } from './types';
+import { fontOptions, useSysFonts } from './useSysFonts';
 
 const isShape = (o: WorldObject) =>
   o.kind === 'rect' || isShapeKind(o.kind);
@@ -147,6 +142,8 @@ export function RightDock({
   chain,
   chainOverflow,
   onChainText,
+  onApplyMark,
+  onClearMarks,
   onAreaData,
   onAreaDataAll,
   onRect,
@@ -165,6 +162,10 @@ export function RightDock({
   chain: Chain | null;
   chainOverflow: string;
   onChainText: (text: string) => void;
+  /** 連鎖テキスト [s,e) への部分装飾適用 */
+  onApplyMark: (s: number, e: number, attrs: Partial<TextAttrs>) => void;
+  /** 連鎖テキスト [s,e) 内の装飾マーク除去 */
+  onClearMarks: (s: number, e: number) => void;
   onAreaData: (patch: Partial<TextAreaData>) => void;
   onAreaDataAll: (patch: Partial<TextAreaData>) => void;
   onRect: (r: { x: number; y: number; w: number; h: number }) => void;
@@ -190,6 +191,9 @@ export function RightDock({
     onInsertAfter: (index: number) => void;
     onFooter: (on: boolean) => void;
     onOpacity: (v: number) => void;
+    /** ドキュメント既定フォント（新規テキストエリアへ適用） */
+    font: string;
+    onFont: (s: string) => void;
   };
   t: TFunc;
 }) {
@@ -207,6 +211,8 @@ export function RightDock({
           areaData={one.data as TextAreaData}
           overflow={chainOverflow}
           onText={onChainText}
+          onApplyMark={onApplyMark}
+          onClearMarks={onClearMarks}
           onAreaData={onAreaData}
           onClose={onDeselect}
           t={t}
@@ -353,6 +359,7 @@ function FontBatch({
   onApply: (patch: Partial<TextAreaData>) => void;
   t: TFunc;
 }) {
+  const fonts = fontOptions(useSysFonts());
   return (
     <div className="doc-props">
       <header>
@@ -365,9 +372,9 @@ function FontBatch({
             defaultValue=""
             onChange={(e) => onApply({ fontFamily: e.currentTarget.value })}
           >
-            {FONT_FAMILIES.map((f) => (
-              <option key={f.value} value={f.value}>
-                {f.label}
+            {fonts.map((f) => (
+              <option key={f} value={f}>
+                {f}
               </option>
             ))}
           </select>
@@ -539,23 +546,23 @@ function ShapeProps({
           />{' '}
           mm
         </label>
+        <label>
+          {t('shape.lineStyle')}
+          <select
+            value={dashIdx}
+            onChange={(e) =>
+              onStyle({ dash: DASHES[+e.currentTarget.value].value })
+            }
+          >
+            {DASHES.map((d, i) => (
+              <option key={d.key} value={i}>
+                {t(d.key)}
+              </option>
+            ))}
+          </select>
+        </label>
         {isLine && (
           <>
-            <label>
-              {t('shape.lineStyle')}
-              <select
-                value={dashIdx}
-                onChange={(e) =>
-                  onStyle({ dash: DASHES[+e.currentTarget.value].value })
-                }
-              >
-                {DASHES.map((d, i) => (
-                  <option key={d.key} value={i}>
-                    {t(d.key)}
-                  </option>
-                ))}
-              </select>
-            </label>
             <label>
               {t('shape.capStart')}
               <select
@@ -650,6 +657,8 @@ function DocProps({
   onInsertAfter,
   onFooter,
   onOpacity,
+  font,
+  onFont,
   t,
 }: {
   title: string;
@@ -665,9 +674,12 @@ function DocProps({
   onInsertAfter: (index: number) => void;
   onFooter: (on: boolean) => void;
   onOpacity: (v: number) => void;
+  font: string;
+  onFont: (s: string) => void;
   t: TFunc;
 }) {
   const [ins, setIns] = useState(1);
+  const fonts = fontOptions(useSysFonts());
   return (
     <div className="doc-props">
       <header>
@@ -730,6 +742,16 @@ function DocProps({
             onChange={(e) => onOpacity(+e.currentTarget.value)}
           />{' '}
           {pageOpacity}%
+        </label>
+        <label>
+          {t('doc.font')}
+          <select value={font} onChange={(e) => onFont(e.currentTarget.value)}>
+            {[...new Set([font, ...fonts])].map((f) => (
+              <option key={f} value={f}>
+                {f}
+              </option>
+            ))}
+          </select>
         </label>
       </div>
       <footer className="hint">{t('doc.hint')}</footer>
