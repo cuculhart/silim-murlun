@@ -13,7 +13,7 @@ printing.
 
 **[Live demo](https://cuculhart.github.io/silim-murlun/)** — runs in your browser, no install
 
-See [CHANGELOG](CHANGELOG.md) for the release history (latest: v0.6.0).
+See [CHANGELOG](CHANGELOG.md) for the release history.
 
 ## Features
 

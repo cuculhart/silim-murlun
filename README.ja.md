@@ -11,7 +11,7 @@ English: [README.md](README.md)
 
 **[Live demo](https://cuculhart.github.io/silim-murlun/)** — インストール不要・ブラウザだけで動きます
 
-変更履歴は [CHANGELOG](CHANGELOG.md) を参照（最新: v0.6.0）。
+変更履歴は [CHANGELOG](CHANGELOG.md) を参照。
 
 ## 機能
 
