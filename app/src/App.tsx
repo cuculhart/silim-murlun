@@ -26,6 +26,7 @@ import {
   type PaperSize,
   type TextAttrs,
 } from 'inimbal';
+import { About } from './About';
 import { RightDock } from './Inspector';
 import { LinkWires, type LinkSel } from './LinkWires';
 import { MenuPane, type ShapeTool, type Theme } from './MenuPane';
@@ -34,6 +35,7 @@ import { Printout } from './Printout';
 import { Rulers } from './Rulers';
 import { makeT, tf, type Lang } from './i18n';
 import { packArchive, unpackArchive } from './docio';
+import { clearDraft, loadDraft, saveDraft } from './autosave';
 import { createCanvasMeasurer } from './measure';
 import {
   DEFAULT_TEXT_DATA,
@@ -145,6 +147,21 @@ export function App() {
   const createdAtRef = useRef(new Date().toISOString());
   const dirtyRef = useRef(false);
   const applyingRef = useRef(false);
+  // v0.9: About オーバーレイ
+  const [aboutOpen, setAboutOpen] = useState(false);
+  // v0.9: 自動保存した下書きの時刻（「下書き HH:MM」表示用）
+  const [draftAt, setDraftAt] = useState<string | null>(null);
+  // v0.9: 下書き fingerprint — createdAt+タイトルの文書識別子。
+  // 下書きへ併記しておき、復元時に「最後に開いていた文書」の
+  // fp（localStorage）と照合 — 別文書の下書きを誤復元しない
+  // （書庫・新規への切替直後に古い下書きが蘇るケースの抑止）
+  const docFp = (createdAt: string, title: string) =>
+    `${createdAt}\n${title}`;
+  const stampDocFp = (createdAt: string, title: string) =>
+    localStorage.setItem('silim-docfp', docFp(createdAt, title));
+  // 起動時の下書き確認が済むまで自動保存を走らせない
+  // （確認前に空ドキュメントを保存して下書きを上書きするのを防ぐ）
+  const draftReadyRef = useRef(false);
   const [docFont, setDocFont] = useState('sans-serif');
   type Snap = {
     objects: WorldObject[];
@@ -282,6 +299,7 @@ export function App() {
         setLinkFrom(null);
         setSelLink(null);
         setCtxMenu(null);
+        setAboutOpen(false);
         setShapeTool(null);
         setShapeDrag(null);
         if (engine.mode === 'shape') engine.cancelShapeDraw();
@@ -491,6 +509,82 @@ export function App() {
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, []);
 
+  // ── v0.9: 起動時の下書き復元 — IndexedDB に自動保存があり、
+  // 既定ドキュメントと異なる場合のみ復元する（同一なら何もしない。
+  // 確認が済むまで draftReadyRef で自動保存の書込みを止めておく） ──
+  useEffect(() => {
+    let alive = true;
+    void loadDraft().then((rec) => {
+      draftReadyRef.current = true;
+      if (!alive || !rec) return;
+      // 別文書の下書きは復元しない — 最後に開いていた文書の
+      // fp と不一致ならスキップ（両方無い旧形式は従来どおり）
+      const lastFp = localStorage.getItem('silim-docfp');
+      if (rec.fp && lastFp && rec.fp !== lastFp) return;
+      try {
+        const r = unpackArchive(rec.slm);
+        const blank = {
+          model: createPages({ size: 'A4', landscape: false }, 3),
+          objects: [] as WorldObject[],
+          chains: [] as Chain[],
+          footer: true,
+          title: '',
+          pageOpacity: 50,
+          docFont: 'sans-serif',
+        };
+        const cur = {
+          model: r.model,
+          objects: r.objects,
+          chains: r.chains,
+          footer: r.footer,
+          title: r.title,
+          pageOpacity: r.pageOpacity,
+          docFont: r.docFont ?? 'sans-serif',
+        };
+        if (JSON.stringify(blank) === JSON.stringify(cur)) return;
+        applyArchive(r);
+        setDraftAt(rec.at);
+        flash(t('hint.draftRestored'));
+      } catch {
+        // 壊れた下書きは無視する（復元も削除もしない）
+      }
+    });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [engine]);
+
+  // ── v0.9: 自動保存 — 変更のたびに 1.5s デバウンスで書庫と同じ
+  // 直列化（画像込みの完全な文書状態）を IndexedDB へ下書き保存する ──
+  useEffect(() => {
+    if (!draftReadyRef.current) return;
+    const id = window.setTimeout(() => {
+      try {
+        const u8 = packArchive({
+          spec: model.spec,
+          pages: model.pages,
+          objects: contentObjects(),
+          chains,
+          footer,
+          title: docTitle,
+          createdAt: createdAtRef.current,
+          pageOpacity,
+          docFont,
+        });
+        const fp = docFp(createdAtRef.current, docTitle);
+        void saveDraft(u8, fp).then((at) => {
+          if (at) setDraftAt(at);
+        });
+        stampDocFp(createdAtRef.current, docTitle);
+      } catch {
+        // 直列化・保存の失敗は静かに諦める（次の変更で再試行される）
+      }
+    }, 1500);
+    return () => window.clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [engine.doc.objects, chains, model, footer, docTitle, pageOpacity, docFont]);
+
   // F24: Alt 押下でスナップ（グリッド＋オブジェクト吸着）を一時解除
   useEffect(() => {
     const set = (off: boolean) => {
@@ -544,6 +638,9 @@ export function App() {
     setPageOpacity(50);
     setDocFont('sans-serif');
     createdAtRef.current = new Date().toISOString();
+    // v0.9: 文書が切り替わった時点で fp を更新 — 旧文書の
+    // 下書きが残っていても次回起動で誤復元しない
+    stampDocFp(createdAtRef.current, '');
     dirtyRef.current = false;
     engine.setSelection([]);
     focusPage(0, m);
@@ -573,43 +670,47 @@ export function App() {
     dirtyRef.current = false;
     setSaveDlg(null);
   };
+  // 書庫の展開結果をアプリ状態へ反映する（書庫読込と下書き復元で共用）
+  const applyArchive = (r: ReturnType<typeof unpackArchive>) => {
+    // 過去バージョンで別グループへ同じ gN が振られて保存された
+    // 汚染を修復する — 同名グループをページ単位で分割し連番化
+    const prects = pageRects(r.model.spec, r.model.pages);
+    const gmap = new Map<string, string>();
+    let gn = 0;
+    const objects = r.objects.map((o) => {
+      if (!o.group) return o;
+      const cx = o.x + o.w / 2;
+      const cy = o.y + o.h / 2;
+      const pi = prects.findIndex(
+        (p) =>
+          cx >= p.x && cx < p.x + p.w && cy >= p.y && cy < p.y + p.h,
+      );
+      const key = `${o.group}@${pi}`;
+      let g = gmap.get(key);
+      if (!g) gmap.set(key, (g = `g${++gn}`));
+      return { ...o, group: g };
+    });
+    groupSeqRef.current = gn + 1;
+    commitPages(r.model, objects);
+    setChains(r.chains);
+    setFooter(r.footer);
+    setDocTitle(r.title);
+    setPageOpacity(r.pageOpacity);
+    setDocFont(r.docFont ?? 'sans-serif');
+    createdAtRef.current = r.createdAt || new Date().toISOString();
+    // v0.9: 下書き fingerprint を開いた文書へ更新（下書き復元
+    // 経路でも同一 fp になるため二重書きは害なし）
+    stampDocFp(createdAtRef.current, r.title);
+    dirtyRef.current = false;
+    engine.setSelection([]);
+    focusPage(0, r.model);
+  };
   const onOpenFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.currentTarget.files?.[0];
     e.currentTarget.value = '';
     if (!f) return;
     f.arrayBuffer()
-      .then((buf) => {
-        const r = unpackArchive(new Uint8Array(buf));
-        // 過去バージョンで別グループへ同じ gN が振られて保存された
-        // 汚染を修復する — 同名グループをページ単位で分割し連番化
-        const prects = pageRects(r.model.spec, r.model.pages);
-        const gmap = new Map<string, string>();
-        let gn = 0;
-        const objects = r.objects.map((o) => {
-          if (!o.group) return o;
-          const cx = o.x + o.w / 2;
-          const cy = o.y + o.h / 2;
-          const pi = prects.findIndex(
-            (p) =>
-              cx >= p.x && cx < p.x + p.w && cy >= p.y && cy < p.y + p.h,
-          );
-          const key = `${o.group}@${pi}`;
-          let g = gmap.get(key);
-          if (!g) gmap.set(key, (g = `g${++gn}`));
-          return { ...o, group: g };
-        });
-        groupSeqRef.current = gn + 1;
-        commitPages(r.model, objects);
-        setChains(r.chains);
-        setFooter(r.footer);
-        setDocTitle(r.title);
-        setPageOpacity(r.pageOpacity);
-        setDocFont(r.docFont ?? 'sans-serif');
-        createdAtRef.current = r.createdAt || new Date().toISOString();
-        dirtyRef.current = false;
-        engine.setSelection([]);
-        focusPage(0, r.model);
-      })
+      .then((buf) => applyArchive(unpackArchive(new Uint8Array(buf))))
       .catch((err: Error) => flash(tf(t, 'hint.cantOpen', err.message)));
   };
 
@@ -1103,6 +1204,12 @@ export function App() {
   };
   const goToPage = (i: number) => focusPage(i);
 
+  // 「下書き HH:MM」表示用の時刻整形
+  const fmtTime = (iso: string) => {
+    const d = new Date(iso);
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  };
+
   const { spec } = model;
   const z = engine.viewport.zoom;
 
@@ -1274,6 +1381,7 @@ export function App() {
             localStorage.setItem('silim-lang', next);
           }}
           lang={lang}
+          onAbout={() => setAboutOpen(true)}
           t={t}
         />
         <div
@@ -1724,6 +1832,19 @@ export function App() {
       <footer className="status">
         <span className="hint">{hint || t('hint.default')}</span>
         <span className="sep" />
+        {/* v0.9: 自動保存した下書きの時刻 — クリックで明示削除 */}
+        {draftAt && (
+          <span
+            title={t('status.draftClearTip')}
+            style={{ cursor: 'pointer' }}
+            onClick={() => {
+              void clearDraft();
+              setDraftAt(null);
+            }}
+          >
+            {tf(t, 'status.draft', fmtTime(draftAt))} ✕
+          </span>
+        )}
         <span>{tf(t, 'status.pages', model.pages.length)}</span>
         <span>scale {engine.scaleText()}</span>
         <span>
@@ -1917,6 +2038,11 @@ export function App() {
             )}
           </div>
         </div>
+      )}
+
+      {/* v0.9: About オーバーレイ */}
+      {aboutOpen && (
+        <About onClose={() => setAboutOpen(false)} lang={lang} t={t} />
       )}
 
       {/* 名前を付けて保存ダイアログ */}

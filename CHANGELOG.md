@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-03
+
+### English
+
+Autosave (draft recovery) and an About screen — both ported from Kusuma Plava.
+
+- Autosave (N-12): on every change, the full document state (same serialization as the .slm archive, including images) is saved to IndexedDB after a 1.5s debounce. On launch, a draft that differs from the default document is restored with a "Draft restored" hint. The status bar shows "Draft HH:MM" — click it to delete the draft.
+- Draft fingerprint: the draft carries a document fingerprint (createdAt + title) checked against the last-opened document, so a different document's draft is never wrongly restored.
+- About screen: a new "説" ("?") menu item opens an overlay with the app name, concept, version, author, and a link to cuculhart.com (new tab; the English UI links to the English top page).
+- The version label was removed from the menu title — About is now the only place the version is shown.
+
+### 日本語
+
+自動保存（下書き復元）と About 画面 — どちらも Kusuma Plava からの移植。
+
+- 自動保存（N-12）: 変更のたびに 1.5s デバウンスで、.slm 書庫と同じ直列化（画像込みの完全な文書状態）を IndexedDB へ下書き保存。起動時に既定ドキュメントと異なる下書きがあれば復元し「下書きを復元しました」を表示。ステータスバーの「下書き HH:MM」はクリックで削除可能
+- 下書き fingerprint: 下書きに文書 fingerprint（作成時刻+タイトル）を併記し、最後に開いていた文書と照合 — 別文書の下書きを誤復元しない
+- About 画面: メニュー末尾の「説」から、アプリ名・コンセプト・バージョン・作者表記と cuculhart.com へのリンク（新規タブ。英語 UI は英語トップへ）を開く
+- メニュータイトルのバージョン表記を削除 — バージョン表示は About に一本化
+
 ## [0.8.1] - 2026-10-29
 
 ### English

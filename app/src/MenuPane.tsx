@@ -40,6 +40,7 @@ export function MenuPane({
   onTheme,
   onLang,
   lang,
+  onAbout,
   t,
 }: {
   collapsed: boolean;
@@ -66,6 +67,8 @@ export function MenuPane({
   onTheme: (t: Theme) => void;
   onLang: () => void;
   lang: 'ja' | 'en';
+  /** v0.9: About オーバーレイを開く */
+  onAbout: () => void;
   t: TFunc;
 }) {
   const item = (
@@ -97,9 +100,7 @@ export function MenuPane({
       >
         <span className="m-ic">≡</span>
         {!collapsed && (
-          <span className="m-label">
-            Silim Murlun <span className="m-ver">v0.8.1</span>
-          </span>
+          <span className="m-label">Silim Murlun</span>
         )}
       </button>
       {item('Aa', t('menu.lang'), onLang, { title: t('menu.langTip') })}
@@ -171,6 +172,9 @@ export function MenuPane({
           </select>
         </label>
       )}
+      {/* v0.9: About — バージョン表記はオーバーレイ側へ一本化
+          （メニューの m-ver は撤去） */}
+      {item('説', t('menu.about'), onAbout, { enIc: '?' })}
     </nav>
   );
 }

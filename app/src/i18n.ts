@@ -38,6 +38,12 @@ const ja = {
   'menu.themeTip': 'テーマ切替（次は $1）',
   'menu.lang': 'English',
   'menu.langTip': 'Switch to English UI',
+  'menu.about': 'このアプリ',
+
+  // About（v0.9）
+  'about.body':
+    '方眼紙にページを縦に並べ、テキスト・画像・シェイプを実寸（mm）で置いていくページレイアウトエディタ。テキストエリア同士を線で結ぶと、あふれた文が自動で次のエリアへ流れます。置いたものは置いた場所に残る——印刷物ファーストのエディタです。',
+  'about.author': '作者・配布元',
 
   // 連鎖ペイン
   'chain.title': '連鎖テキスト（$1エリア）',
@@ -131,6 +137,8 @@ const ja = {
   'page.landscape': '横',
   'page.portrait': '縦',
   'status.pages': '$1ページ',
+  'status.draft': '下書き $1',
+  'status.draftClearTip': '自動保存した下書き — クリックで削除',
   'theme.standard': '標準（OS連動）',
   'theme.light': 'ライト',
   'theme.dark': 'ダーク',
@@ -143,6 +151,7 @@ const ja = {
   'hint.linkFrom': '接続の起点は連鎖の末尾エリアです',
   'hint.linkTo': '接続先は別連鎖の先頭エリアです',
   'hint.cantOpen': '開けません: $1',
+  'hint.draftRestored': '下書きを復元しました',
   'confirm.new': '新規作成します。現在の内容は破棄されます。',
 
   // ダイアログ・コンテキストメニュー・印刷
@@ -190,6 +199,11 @@ const en: Record<keyof typeof ja, string> = {
   'menu.themeTip': 'Switch theme (next: $1)',
   'menu.lang': 'Japanese',
   'menu.langTip': '日本語 UI に切り替え',
+  'menu.about': 'About',
+
+  'about.body':
+    'A print-first page layout editor — page frames line up on grid paper and you place text, images, and shapes at real-world millimeter size. Link two text areas and overflow text flows on to the next. What you place stays where you placed it.',
+  'about.author': 'Author / distribution',
 
   'chain.title': 'Chain text ($1 areas)',
   'chain.close': 'Close',
@@ -281,6 +295,8 @@ const en: Record<keyof typeof ja, string> = {
   'page.landscape': 'L',
   'page.portrait': 'P',
   'status.pages': '$1 pages',
+  'status.draft': 'Draft $1',
+  'status.draftClearTip': 'Autosaved draft — click to delete',
   'theme.standard': 'Standard (OS)',
   'theme.light': 'Light',
   'theme.dark': 'Dark',
@@ -292,6 +308,7 @@ const en: Record<keyof typeof ja, string> = {
   'hint.linkFrom': 'The link source must be the last area of a chain',
   'hint.linkTo': 'The target must be the first area of another chain',
   'hint.cantOpen': "Can't open: $1",
+  'hint.draftRestored': 'Draft restored',
   'confirm.new': 'Create a new document? Current content will be discarded.',
 
   'dlg.filename': 'File name',
