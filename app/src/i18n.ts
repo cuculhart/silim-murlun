@@ -56,6 +56,7 @@ const ja = {
   'about.body':
     '方眼紙にページを縦に並べ、テキスト・画像・シェイプを実寸（mm）で置いていくページレイアウトエディタ。テキストエリア同士を線で結ぶと、あふれた文が自動で次のエリアへ流れます。置いたものは置いた場所に残る——印刷物ファーストのエディタです。',
   'about.author': '作者・配布元',
+  'about.fonts': '同梱フォント',
 
   // 連鎖ペイン
   'chain.title': '連鎖テキスト（$1エリア）',
@@ -227,6 +228,7 @@ const en: Record<keyof typeof ja, string> = {
   'about.body':
     'A print-first page layout editor — page frames line up on grid paper and you place text, images, and shapes at real-world millimeter size. Link two text areas and overflow text flows on to the next. What you place stays where you placed it.',
   'about.author': 'Author / distribution',
+  'about.fonts': 'Bundled fonts',
 
   'chain.title': 'Chain text ($1 areas)',
   'chain.close': 'Close',

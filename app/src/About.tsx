@@ -38,6 +38,25 @@ export function About({
             cuculhart.com
           </a>
         </p>
+        <p className="about-author">
+          {t('about.fonts')}{' '}
+          <a
+            href="licenses/OFL-noto-sans-jp.txt"
+            target="_blank"
+            rel="noopener"
+          >
+            Noto Sans JP
+          </a>{' '}
+          /{' '}
+          <a
+            href="licenses/OFL-noto-sans.txt"
+            target="_blank"
+            rel="noopener"
+          >
+            Noto Sans
+          </a>{' '}
+          (SIL OFL 1.1)
+        </p>
         <div className="btns">
           <button onClick={onClose}>{t('print.close')}</button>
         </div>
