@@ -9,7 +9,7 @@ import {
   type WorldObject,
   type ZOrder,
 } from '@kimetron/core';
-import type { Chain, TextAttrs } from 'inimbal';
+import type { Chain, KinsokuMode, TextAttrs } from 'inimbal';
 import type { TFunc } from './i18n';
 import { tf } from './i18n';
 import { ChainPane } from './ChainPane';
@@ -199,6 +199,9 @@ export function RightDock({
     /** ドキュメント既定フォント（新規テキストエリアへ適用） */
     font: string;
     onFont: (s: string) => void;
+    /** v0.11: 禁則処理 — なし / 追い出し（書庫に保存） */
+    kinsoku?: KinsokuMode;
+    onKinsoku: (k: KinsokuMode | undefined) => void;
   };
   t: TFunc;
 }) {
@@ -661,6 +664,8 @@ function DocProps({
   onOpacity,
   font,
   onFont,
+  kinsoku,
+  onKinsoku,
   t,
 }: {
   title: string;
@@ -678,6 +683,8 @@ function DocProps({
   onOpacity: (v: number) => void;
   font: string;
   onFont: (s: string) => void;
+  kinsoku?: KinsokuMode;
+  onKinsoku: (k: KinsokuMode | undefined) => void;
   t: TFunc;
 }) {
   const [ins, setIns] = useState(1);
@@ -747,6 +754,22 @@ function DocProps({
         <label>
           {t('doc.font')}
           <FontPick value={font} onPick={onFont} t={t} />
+        </label>
+        <label title={t('doc.kinsokuTip')}>
+          {t('doc.kinsoku')}
+          <select
+            value={kinsoku ?? ''}
+            onChange={(e) =>
+              onKinsoku(
+                (e.currentTarget.value || undefined) as
+                  | KinsokuMode
+                  | undefined,
+              )
+            }
+          >
+            <option value="">{t('doc.kinsoku.off')}</option>
+            <option value="oidashi">{t('doc.kinsoku.oi')}</option>
+          </select>
         </label>
       </div>
       <footer className="hint">{t('doc.hint')}</footer>

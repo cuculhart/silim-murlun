@@ -41,12 +41,15 @@ const ja = {
   'menu.about': 'このアプリ',
   'menu.find': '検索',
 
-  // 全文検索（v0.10）・フォント選択
+  // 全文検索（v0.10）・置換（v0.11）・フォント選択
   'find.open': '全文検索（Ctrl+F）',
   'find.placeholder': '検索…',
+  'find.replace': '置換後…',
   'find.prev': '前へ',
   'find.next': '次へ',
   'find.count': '$1/$2',
+  'find.replaceOne': '置換',
+  'find.replaceAll': '全置換',
   'font.custom': 'カスタム…',
   'font.customPh': 'フォント名',
   'font.missing':
@@ -98,6 +101,11 @@ const ja = {
   'doc.insert': '挿入',
   'doc.footer': 'フッターにページ番号（n / 全ページ）',
   'doc.opacity': '用紙の透過',
+  'doc.kinsoku': '禁則処理',
+  'doc.kinsoku.off': 'なし',
+  'doc.kinsoku.oi': '追い出し',
+  'doc.kinsokuTip':
+    '行頭の、。や行末の「を避けて折り返します（書庫に保存）',
   'doc.hint': '未選択 / 複数選択 — オブジェクトを選ぶとプロパティが出ます',
   'img.title': '画像',
   'img.lock': 'アスペクト比をロック',
@@ -218,9 +226,12 @@ const en: Record<keyof typeof ja, string> = {
 
   'find.open': 'Find in document (Ctrl+F)',
   'find.placeholder': 'Find…',
+  'find.replace': 'Replace with…',
   'find.prev': 'Previous',
   'find.next': 'Next',
   'find.count': '$1/$2',
+  'find.replaceOne': 'Replace',
+  'find.replaceAll': 'All',
   'font.custom': 'Custom…',
   'font.customPh': 'Font name',
   'font.missing': 'Not installed here — falls back to the default font',
@@ -268,6 +279,11 @@ const en: Record<keyof typeof ja, string> = {
   'doc.insert': 'Insert',
   'doc.footer': 'Footer page number (n / total)',
   'doc.opacity': 'Paper opacity',
+  'doc.kinsoku': 'Line-break rules',
+  'doc.kinsoku.off': 'Off',
+  'doc.kinsoku.oi': 'Push-out',
+  'doc.kinsokuTip':
+    'Wraps lines so ，。 never start a line and open brackets never end one (saved in the archive)',
   'doc.hint': 'Nothing / multiple selected — select an object for properties',
   'img.title': 'Image',
   'img.lock': 'Lock aspect ratio',

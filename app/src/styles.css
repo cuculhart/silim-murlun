@@ -834,6 +834,16 @@ body,
   border-radius: 4px;
 }
 
+.find-bar .find-r {
+  width: 110px;
+  font-size: 12px;
+  padding: 2px 8px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
 .find-bar .find-count {
   min-width: 44px;
   text-align: center;

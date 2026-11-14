@@ -1,12 +1,13 @@
 // テキスト計測: canvas measureText による実寸（96dpi）計測。
 // spike index.html の fitText を inimbal の TextMeasurer IF に移植。
-// 英単語は空白で折り返し、日本語等は文字単位で強制切断。
+// 行分割の判断（空白切り・強制切断・禁則前倒し）は inimbal の
+// fitText へ委譲し、ここではラン別の幅・字サイズ計測だけを担当する。
 // slices の join === text を保つため、常に「収まる接頭辞長」を返す。
 // box.marks（部分装飾）があるとラン境界で ctx.font を切替え、
 // 行高さは行内の最大 fontSize で計る。
 
-import { sliceRuns, type TextAttrs } from 'inimbal';
-import type { TextMeasurer } from 'inimbal';
+import { fitText, sliceRuns, type TextAttrs } from 'inimbal';
+import type { KinsokuMode, TextMeasurer } from 'inimbal';
 import { LINE_HEIGHT, MM_PX } from './types';
 
 function fontStr(a: TextAttrs): string {
@@ -14,7 +15,8 @@ function fontStr(a: TextAttrs): string {
   return `${a.italic ? 'italic ' : ''}${a.bold ? 'bold ' : ''}${px}px ${a.fontFamily ?? 'sans-serif'}`;
 }
 
-export function createCanvasMeasurer(): TextMeasurer {
+/** v0.11: kinsoku（文書設定）は閉包で保持 — 変更時は作り直す */
+export function createCanvasMeasurer(kinsoku?: KinsokuMode): TextMeasurer {
   const ctx = document.createElement('canvas').getContext('2d')!;
   return {
     fit(text, box) {
@@ -62,52 +64,17 @@ export function createCanvasMeasurer(): TextMeasurer {
         return m;
       };
 
-      const maxW = box.width * MM_PX;
-      const maxH = box.height * MM_PX;
-      let pos = 0;
-      let lineStart = 0;
-      let usedH = 0;
-      let lineMaxPx = 0;
-      while (pos < text.length) {
-        const ch = text[pos];
-        const rpx = (runAt(pos).attrs.fontSize ?? 4) * MM_PX;
-        if (ch === '\n') {
-          const lh = Math.max(lineMaxPx, rpx) * LINE_HEIGHT;
-          // 2行目以降が高さに入らないなら手前で切る（1行目は必ず計上）
-          if (usedH > 0 && usedH + lh > maxH) {
-            pos = lineStart;
-            break;
-          }
-          usedH += lh;
-          lineMaxPx = 0;
-          pos++;
-          lineStart = pos;
-          continue;
-        }
-        if (widthOf(lineStart, pos + 1) <= maxW) {
-          lineMaxPx = Math.max(lineMaxPx, rpx);
-          pos++;
-          continue;
-        }
-        if (pos === lineStart) {
-          lineMaxPx = Math.max(lineMaxPx, rpx);
-          pos++; // 1字でも幅超過 → 強制進行
-          continue;
-        }
-        // 直前の空白で切る（空白は前行末へ残す）
-        const sp = text.lastIndexOf(' ', pos);
-        const breakPos = sp >= lineStart ? sp + 1 : pos;
-        const lh = maxPxIn(lineStart, breakPos) * LINE_HEIGHT;
-        if (usedH > 0 && usedH + lh > maxH) {
-          pos = lineStart;
-          break;
-        }
-        usedH += lh;
-        pos = breakPos;
-        lineStart = pos;
-        lineMaxPx = 0;
-      }
-      return pos;
+      return fitText(
+        text,
+        box.width * MM_PX,
+        box.height * MM_PX,
+        {
+          widthOf,
+          sizeAt: (i) => (runAt(i).attrs.fontSize ?? 4) * MM_PX,
+          maxSizeIn: maxPxIn,
+        },
+        { lineHeight: LINE_HEIGHT, kinsoku },
+      );
     },
   };
 }

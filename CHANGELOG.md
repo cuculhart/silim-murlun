@@ -2,6 +2,64 @@
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-15
+
+### English
+
+Kinsoku line-break rules (push-out only), find & replace, and a
+layout memo so non-layout changes stop re-measuring.
+
+- Kinsoku — push-out only (N-24): a new "禁則処理 / Line-break
+  rules" document setting (`なし / 追い出し`) adjusts line-break
+  points inside `fit()`. When the next line would start with a
+  head-forbidden char (、。・brackets-closing・small kana・
+  `-+/#%_` etc.) or the current line would end with an
+  end-forbidden char (open brackets, hyphen), the break point is
+  pulled back by up to 2 characters — the same boundary rule as
+  Kusuma Plava's vertical typesetting. No hanging/condensed
+  kinsoku. The character tables live in `inimbal/src/kinsoku.ts`,
+  and the horizontal break loop was extracted there as `fitText`
+  (metrics injected) so inimbal unit tests cover the kinsoku
+  cases. `docio` gains `kinsoku?: 'oidashi'` — a missing field
+  means "off", so archives from v0.10 and earlier reproduce their
+  exact old layout. New documents default to push-out. The value
+  is saved in archives, undo snapshots, and drafts.
+- Find & replace (N-33): the find bar gains a replace input plus
+  "置換 / 全置換" buttons (Kusuma `replaceOne/replaceAll` parity).
+  Replacements go through the chain-text path, so mark
+  coordinates are kept by `adjustMarksForEdit`, and the selection
+  lands on the replaced text via the existing jumpSel bridge.
+- Layout signature memo (N-28): each chain's `layoutChain`
+  result is memoized by a signature of text, marks, area inner
+  sizes + formatting, and the kinsoku mode. Selection, scroll,
+  and other non-layout changes no longer re-measure — this also
+  offsets the extra measurement cost kinsoku branching adds.
+
+### 日本語
+
+禁則処理（追い出しのみ）、検索＋置換、組版に無関係な変更で
+再計測しないレイアウト memo。
+
+- 禁則処理 — 追い出しのみ（N-24）: 文書設定に「禁則処理」
+  （なし / 追い出し）を追加。次行頭が行頭禁則字（、。・
+  閉じ括弧・小さい仮名・`-+/#%_` 等）または前行末が行末禁則字
+  （開き括弧・ハイフン）のとき、分割点を最大2字前倒しして
+  次行へ送る — kusuma-plava 縦組と同じ境界ルール。ぶら下げ・
+  追い込みはなし。字種表は `inimbal/src/kinsoku.ts` に新設し、
+  横組の行分割ループも `fitText` として同所へ抽出（計測は
+  注入）— 禁則ケースを inimbal のユニットテストで検証。
+  `docio` に `kinsoku?: 'oidashi'` を追加 — 欠落 = なしなので
+  v0.10 以前の書庫は旧レイアウトをそのまま再現。新規文書の
+  既定は追い出し。書庫・Undo・下書きで保持される
+- 置換（N-33）: find バーに置換入力と「置換」「全置換」
+  ボタンを追加（kusuma の replaceOne/replaceAll 相当）。
+  連鎖テキスト経路を通るため marks 座標は adjustMarksForEdit
+  で維持され、置換位置の選択範囲は既存の jumpSel 経路で復元
+- signature memo（N-28）: 連鎖の layoutChain 結果を text・
+  marks・エリア内寸+書式・kinsoku のシグネチャで memo 化。
+  選択・スクロール等の非組版変更では再計測しない — 禁則で
+  増える計測コストの相殺も兼ねる
+
 ## [0.10.0] - 2026-11-14
 
 ### English

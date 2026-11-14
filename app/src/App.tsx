@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { IsleCanvas, useEngine, useEngineVersion } from '@kimetron/react';
 import { formatLength, type Engine, type WorldObject } from '@kimetron/core';
@@ -21,6 +21,7 @@ import {
   sliceRuns,
   unlinkAt,
   type Chain,
+  type KinsokuMode,
   type LayoutResult,
   type PageModel,
   type PaperSize,
@@ -162,9 +163,10 @@ export function App() {
   // 起動時の下書き確認が済むまで自動保存を走らせない
   // （確認前に空ドキュメントを保存して下書きを上書きするのを防ぐ）
   const draftReadyRef = useRef(false);
-  // v0.10: 全文検索（全連鎖横断・検索のみ。置換は持たない）
+  // v0.10: 全文検索（全連鎖横断）— v0.11 で置換を追加
   const [findOpen, setFindOpen] = useState(false);
   const [findQ, setFindQ] = useState('');
+  const [findRep, setFindRep] = useState('');
   const [findIdx, setFindIdx] = useState(-1);
   // 検索ヒット → 連鎖ペインの選択範囲への橋渡し（n は適用回数）
   const [jumpSel, setJumpSel] = useState<{
@@ -175,6 +177,11 @@ export function App() {
   } | null>(null);
   const jumpSeqRef = useRef(0);
   const [docFont, setDocFont] = useState(DEFAULT_TEXT_DATA.fontFamily);
+  // v0.11: 禁則処理 — なし / 追い出し。新規文書の既定は追い出し、
+  // 欠落した旧書庫は「なし」として旧レイアウトを再現する
+  const [kinsoku, setKinsoku] = useState<KinsokuMode | undefined>(
+    'oidashi',
+  );
   type Snap = {
     objects: WorldObject[];
     chains: Chain[];
@@ -183,6 +190,7 @@ export function App() {
     title: string;
     pageOpacity: number;
     docFont: string;
+    kinsoku?: KinsokuMode;
   };
   const histRef = useRef<{ past: Snap[]; future: Snap[]; last: number }>({
     past: [],
@@ -213,7 +221,16 @@ export function App() {
   linkModeRef.current = linkMode;
   const placingRef = useRef(placing);
   placingRef.current = placing;
-  const measurerRef = useRef(createCanvasMeasurer());
+  // v0.11: 禁則設定は計測器の閉包へ — 変更時に作り直し（doc 単位）
+  const measurer = useMemo(
+    () => createCanvasMeasurer(kinsoku),
+    [kinsoku],
+  );
+  // N-28: 連鎖レイアウトの signature memo — 組版に無関係な
+  // 再描画（選択・スクロール等）では前回の計測結果を再利用する
+  const layoutMemo = useRef(
+    new Map<string, { sig: string; lr: LayoutResult }>(),
+  );
 
   const flash = (msg: string) => {
     setHint(msg);
@@ -462,6 +479,7 @@ export function App() {
     title: docTitle,
     pageOpacity,
     docFont,
+    kinsoku,
   });
   const applySnap = (s: Snap) => {
     applyingRef.current = true;
@@ -479,6 +497,7 @@ export function App() {
     setDocTitle(s.title);
     setPageOpacity(s.pageOpacity);
     setDocFont(s.docFont);
+    setKinsoku(s.kinsoku);
     snapRef.current = s;
     applyingRef.current = false;
   };
@@ -518,7 +537,7 @@ export function App() {
     }
     snapRef.current = makeSnap();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engine.doc.objects, chains, model, footer, docTitle, pageOpacity, docFont]);
+  }, [engine.doc.objects, chains, model, footer, docTitle, pageOpacity, docFont, kinsoku]);
 
   // 未保存変更があるときの離脱警告
   useEffect(() => {
@@ -551,6 +570,7 @@ export function App() {
           title: '',
           pageOpacity: 50,
           docFont: DEFAULT_TEXT_DATA.fontFamily,
+          kinsoku: 'oidashi',
         };
         const cur = {
           model: r.model,
@@ -560,6 +580,8 @@ export function App() {
           title: r.title,
           pageOpacity: r.pageOpacity,
           docFont: r.docFont ?? DEFAULT_TEXT_DATA.fontFamily,
+          // フィールド欠落の旧下書きは既定と等価扱い（誤復元しない）
+          kinsoku: r.kinsoku ?? 'oidashi',
         };
         if (JSON.stringify(blank) === JSON.stringify(cur)) return;
         applyArchive(r);
@@ -591,6 +613,7 @@ export function App() {
           createdAt: createdAtRef.current,
           pageOpacity,
           docFont,
+          kinsoku,
         });
         const fp = docFp(createdAtRef.current, docTitle);
         void saveDraft(u8, fp).then((at) => {
@@ -603,7 +626,7 @@ export function App() {
     }, 1500);
     return () => window.clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engine.doc.objects, chains, model, footer, docTitle, pageOpacity, docFont]);
+  }, [engine.doc.objects, chains, model, footer, docTitle, pageOpacity, docFont, kinsoku]);
 
   // F24: Alt 押下でスナップ（グリッド＋オブジェクト吸着）を一時解除
   useEffect(() => {
@@ -657,6 +680,7 @@ export function App() {
     setDocTitle('');
     setPageOpacity(50);
     setDocFont(DEFAULT_TEXT_DATA.fontFamily);
+    setKinsoku('oidashi');
     createdAtRef.current = new Date().toISOString();
     // v0.9: 文書が切り替わった時点で fp を更新 — 旧文書の
     // 下書きが残っていても次回起動で誤復元しない
@@ -676,6 +700,7 @@ export function App() {
       createdAt: createdAtRef.current,
       pageOpacity,
       docFont,
+      kinsoku,
     });
     const a = document.createElement('a');
     const url = URL.createObjectURL(
@@ -725,6 +750,7 @@ export function App() {
     setDocTitle(r.title);
     setPageOpacity(r.pageOpacity);
     setDocFont(r.docFont ?? DEFAULT_TEXT_DATA.fontFamily);
+    setKinsoku(r.kinsoku); // 欠落 = なし（旧書庫は旧レイアウト再現）
     createdAtRef.current = r.createdAt || new Date().toISOString();
     // v0.9: 下書き fingerprint を開いた文書へ更新（下書き復元
     // 経路でも同一 fp になるため二重書きは害なし）
@@ -1165,7 +1191,9 @@ export function App() {
     });
   };
 
-  // ── 連鎖レイアウト（再描画のたびに貪欲配分） ──
+  // ── 連鎖レイアウト（signature memo つき貪欲配分） ──
+  // N-28: signature = text・marks・各エリア内寸+書式・kinsoku。
+  // 選択・スクロール等の組版に無関係な変更では再計測しない
   const objById = new Map(engine.doc.objects.map((o) => [o.id, o]));
   const layouts = new Map<string, LayoutResult>();
   for (const c of chains) {
@@ -1186,10 +1214,21 @@ export function App() {
         },
       ];
     });
-    layouts.set(
-      c.id,
-      layoutChain(c.text, boxes, measurerRef.current, c.marks),
-    );
+    const sig = JSON.stringify([c.text, c.marks, boxes, kinsoku]);
+    const hit = layoutMemo.current.get(c.id);
+    if (hit && hit.sig === sig) {
+      layouts.set(c.id, hit.lr);
+    } else {
+      const lr = layoutChain(c.text, boxes, measurer, c.marks);
+      layoutMemo.current.set(c.id, { sig, lr });
+      layouts.set(c.id, lr);
+    }
+  }
+  // 消えた連鎖の memo を掃除
+  if (layoutMemo.current.size > chains.length) {
+    const alive = new Set(chains.map((c) => c.id));
+    for (const k of [...layoutMemo.current.keys()])
+      if (!alive.has(k)) layoutMemo.current.delete(k);
   }
 
   // 右ペインの駆動源（選択オブジェクト配列）
@@ -1315,6 +1354,58 @@ export function App() {
           ? findHits.length - 1
           : (findIdx - 1 + findHits.length) % findHits.length,
       );
+  };
+
+  // 連鎖テキストの更新 — \r\n を LF へ正規化し、marks 座標は
+  // adjustMarksForEdit で維持する（v0.10 の onChainText と同じ規約）
+  const setChainText = (chainId: string, text: string) => {
+    const nt = text.replace(/\r\n?/g, '\n');
+    setChains((cs) =>
+      cs.map((c) =>
+        c.id === chainId
+          ? {
+              ...c,
+              text: nt,
+              marks: adjustMarksForEdit(c.marks, c.text, nt),
+            }
+          : c,
+      ),
+    );
+  };
+
+  // v0.11 N-33: 置換 — 現在のヒット（未選択なら先頭）を置換後
+  // テキストへ入れ替え、置換位置の選択範囲は jumpSel 経路で復元
+  const replaceOne = () => {
+    if (!findQ || !findHits.length) return;
+    const h =
+      findIdx >= 0 && findIdx < findHits.length
+        ? findHits[findIdx]
+        : findHits[0];
+    const c = chains.find((x) => x.id === h.chainId);
+    if (!c) return;
+    setChainText(
+      c.id,
+      c.text.slice(0, h.pos) +
+        findRep +
+        c.text.slice(h.pos + findQ.length),
+    );
+    setFindIdx(-1);
+    jumpHit(h.chainId, h.pos, findRep.length);
+  };
+  const replaceAll = () => {
+    if (!findQ || !findHits.length) return;
+    setChains((cs) =>
+      cs.map((c) => {
+        if (!c.text.includes(findQ)) return c;
+        const nt = c.text.split(findQ).join(findRep);
+        return {
+          ...c,
+          text: nt,
+          marks: adjustMarksForEdit(c.marks, c.text, nt),
+        };
+      }),
+    );
+    setFindIdx(-1);
   };
 
   // 「下書き HH:MM」表示用の時刻整形
@@ -1799,7 +1890,7 @@ export function App() {
             onGo={goToPage}
             t={t}
           />
-          {/* v0.10: 全文検索バー — 全連鎖横断（検索のみ） */}
+          {/* 全文検索・置換バー — 全連鎖横断（v0.11 で置換追加） */}
           {findOpen && (
             <div className="find-bar">
               <input
@@ -1853,6 +1944,32 @@ export function App() {
                 onClick={findNext}
               >
                 ↓
+              </button>
+              <input
+                className="find-r"
+                value={findRep}
+                placeholder={t('find.replace')}
+                onChange={(e) => setFindRep(e.currentTarget.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') replaceOne();
+                  if (e.key === 'Escape') setFindOpen(false);
+                }}
+              />
+              {/* mousedown preventDefault: ボタンにフォーカスが
+                  残ると Enter で再発火してしまうため */}
+              <button
+                disabled={!findHits.length}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={replaceOne}
+              >
+                {t('find.replaceOne')}
+              </button>
+              <button
+                disabled={!findHits.length}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={replaceAll}
+              >
+                {t('find.replaceAll')}
               </button>
               <button
                 title={t('chain.close')}
@@ -1908,19 +2025,7 @@ export function App() {
             selChain ? (layouts.get(selChain.id)?.overflow ?? '') : ''
           }
           onChainText={(text) => {
-            // v0.10: 貼り付け由来の \r\n を LF へ正規化してから保持
-            const nt = text.replace(/\r\n?/g, '\n');
-            setChains((cs) =>
-              cs.map((c) =>
-                c.id === selChain!.id
-                  ? {
-                      ...c,
-                      text: nt,
-                      marks: adjustMarksForEdit(c.marks, c.text, nt),
-                    }
-                  : c,
-              ),
-            );
+            if (selChain) setChainText(selChain.id, text);
           }}
           onApplyMark={(s, e, attrs) =>
             setChains((cs) =>
@@ -2006,6 +2111,8 @@ export function App() {
             onOpacity: setPageOpacity,
             font: docFont,
             onFont: setDocFont,
+            kinsoku,
+            onKinsoku: setKinsoku,
           }}
           t={t}
         />

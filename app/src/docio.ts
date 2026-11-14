@@ -5,7 +5,7 @@
 
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import type { WorldObject } from '@kimetron/core';
-import type { Chain, PageModel } from 'inimbal';
+import type { Chain, KinsokuMode, PageModel } from 'inimbal';
 import { IMG_KIND, type ImageData } from './types';
 
 export const ARCHIVE_FORMAT = 'silim-murlun/1';
@@ -23,6 +23,8 @@ interface ArchiveDoc {
   footer: boolean;
   pageOpacity: number;
   docFont?: string;
+  /** v0.11: 禁則処理 — 欠落 = なし（旧書庫は旧レイアウトを再現） */
+  kinsoku?: KinsokuMode;
 }
 
 const EXT_OF_MIME: Record<string, string> = {
@@ -67,6 +69,7 @@ export function packArchive(input: {
   createdAt: string;
   pageOpacity: number;
   docFont?: string;
+  kinsoku?: KinsokuMode;
 }): Uint8Array {
   const files: Record<string, Uint8Array> = {};
   let imgN = 0;
@@ -91,6 +94,7 @@ export function packArchive(input: {
     footer: input.footer,
     pageOpacity: input.pageOpacity,
     docFont: input.docFont,
+    kinsoku: input.kinsoku,
   };
   files['doc.json'] = strToU8(JSON.stringify(doc));
   return zipSync(files);
@@ -106,6 +110,7 @@ export function unpackArchive(bytes: Uint8Array): {
   createdAt: string;
   pageOpacity: number;
   docFont?: string;
+  kinsoku?: KinsokuMode;
 } {
   const files = unzipSync(bytes);
   const raw = files['doc.json'];
@@ -135,5 +140,8 @@ export function unpackArchive(bytes: Uint8Array): {
     createdAt: doc.createdAt ?? '',
     pageOpacity: doc.pageOpacity ?? 100,
     docFont: doc.docFont,
+    // 未知値は捨てて「なし」扱い — 将来モードが増えた
+    // バージョンの書庫を開いても旧レイアウトへ落ちる
+    kinsoku: doc.kinsoku === 'oidashi' ? 'oidashi' : undefined,
   };
 }
