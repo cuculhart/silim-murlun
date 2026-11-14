@@ -1,4 +1,5 @@
-// 独自書庫形式 — .slm（zip: doc.json + img/ バイナリ）
+// 独自書庫形式 — .chsmf（cucul hart silim murlun format。
+// zip: doc.json + img/ バイナリ。旧称 .slm — 読込は両対応）
 // 画像オブジェクトの dataURL は書庫化時に img/N.ext へ分離し、
 // data.url を 'asset:img/N.ext' 参照に置き換える。
 
@@ -8,7 +9,7 @@ import type { Chain, PageModel } from 'inimbal';
 import { IMG_KIND, type ImageData } from './types';
 
 export const ARCHIVE_FORMAT = 'silim-murlun/1';
-export const ARCHIVE_EXT = '.slm';
+export const ARCHIVE_EXT = '.chsmf';
 
 interface ArchiveDoc {
   format: string;

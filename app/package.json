@@ -1,7 +1,7 @@
 {
   "name": "silim-app",
   "private": true,
-  "version": "0.9.0",
+  "version": "0.10.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,11 +10,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource/noto-sans": "^5.3.0",
+    "@fontsource/noto-sans-jp": "^5.3.1",
     "@kimetron/core": "1.6.1",
     "@kimetron/dom": "1.6.1",
     "@kimetron/react": "1.6.1",
     "fflate": "^0.8.3",
-    "inimbal": "0.9.0",
+    "inimbal": "0.10.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },

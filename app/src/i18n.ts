@@ -13,7 +13,7 @@ const ja = {
   'menu.new': '新規',
   'menu.openDoc': '開く…',
   'menu.save': '名前を付けて保存',
-  'menu.saveTip': '書庫 (.slm) として保存（Ctrl+S）',
+  'menu.saveTip': '書庫 (.chsmf) として保存（Ctrl+S）',
   'menu.undo': '取り消し',
   'menu.redo': 'やり直し',
   'menu.ruler': 'ルーラー',
@@ -39,6 +39,18 @@ const ja = {
   'menu.lang': 'English',
   'menu.langTip': 'Switch to English UI',
   'menu.about': 'このアプリ',
+  'menu.find': '検索',
+
+  // 全文検索（v0.10）・フォント選択
+  'find.open': '全文検索（Ctrl+F）',
+  'find.placeholder': '検索…',
+  'find.prev': '前へ',
+  'find.next': '次へ',
+  'find.count': '$1/$2',
+  'font.custom': 'カスタム…',
+  'font.customPh': 'フォント名',
+  'font.missing':
+    'この環境にインストールされていないフォントです。既定フォントで表示されます',
 
   // About（v0.9）
   'about.body':
@@ -130,6 +142,7 @@ const ja = {
   'nav.first': '先頭ページ',
   'nav.prev': '前ページ',
   'nav.next': '次ページ',
+  'nav.last': '最終ページ',
   'nav.fold': '畳む',
   'nav.open': 'ページ送りを開く',
   'page.insertAfter': 'このページの次に挿入',
@@ -174,7 +187,7 @@ const en: Record<keyof typeof ja, string> = {
   'menu.new': 'New',
   'menu.openDoc': 'Open…',
   'menu.save': 'Save as',
-  'menu.saveTip': 'Save as archive (.slm) (Ctrl+S)',
+  'menu.saveTip': 'Save as archive (.chsmf) (Ctrl+S)',
   'menu.undo': 'Undo',
   'menu.redo': 'Redo',
   'menu.ruler': 'Rulers',
@@ -200,6 +213,16 @@ const en: Record<keyof typeof ja, string> = {
   'menu.lang': 'Japanese',
   'menu.langTip': '日本語 UI に切り替え',
   'menu.about': 'About',
+  'menu.find': 'Find',
+
+  'find.open': 'Find in document (Ctrl+F)',
+  'find.placeholder': 'Find…',
+  'find.prev': 'Previous',
+  'find.next': 'Next',
+  'find.count': '$1/$2',
+  'font.custom': 'Custom…',
+  'font.customPh': 'Font name',
+  'font.missing': 'Not installed here — falls back to the default font',
 
   'about.body':
     'A print-first page layout editor — page frames line up on grid paper and you place text, images, and shapes at real-world millimeter size. Link two text areas and overflow text flows on to the next. What you place stays where you placed it.',
@@ -288,6 +311,7 @@ const en: Record<keyof typeof ja, string> = {
   'nav.first': 'First page',
   'nav.prev': 'Previous page',
   'nav.next': 'Next page',
+  'nav.last': 'Last page',
   'nav.fold': 'Collapse',
   'nav.open': 'Open page navigation',
   'page.insertAfter': 'Insert after this page',

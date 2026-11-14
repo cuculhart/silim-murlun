@@ -806,6 +806,59 @@ body,
   border-radius: 12px;
 }
 
+/* ── 全文検索バー（v0.10・フローティング） ── */
+.find-bar {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 8;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 4px 6px;
+  box-shadow: 0 2px 8px var(--shadow);
+  font-size: 12px;
+  color: var(--text);
+}
+
+.find-bar .find-q {
+  width: 180px;
+  font-size: 12px;
+  padding: 2px 8px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+.find-bar .find-count {
+  min-width: 44px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.find-bar button {
+  border: none;
+  background: none;
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.find-bar button:hover {
+  background: var(--surface2);
+}
+
+.find-bar button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 /* ── シェイプツール ── */
 .shape-overlay {
   position: absolute;

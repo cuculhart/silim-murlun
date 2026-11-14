@@ -2,6 +2,82 @@
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-14
+
+### English
+
+Kusuma Plava follow-up batch — font selection, archive extension,
+document-wide find, last-page nav, and line-ending normalization.
+
+- Bundled fonts (OFL): Noto Sans JP (japanese+latin, 400/700) and
+  Noto Sans (latin+latin-ext, 400/700, italics) ship with the app
+  via @font-face — every machine now renders the same glyphs and
+  metrics, so sample documents and PDF output look identical
+  everywhere. A new "欧文" (Latin) preset uses the bundled Noto
+  Sans. OFL texts ship under `licenses/`
+- Font selection expanded (N-22): all four font pickers (document
+  default, area, batch, selection mark) now use a shared `FontPick`
+  component with three layers — recommended presets carrying
+  CSS font-family stacks (Mincho, Gothic, textbook, rounded Gothic,
+  generic families), enumerated system fonts, and free-form custom
+  names with a warning when the font isn't installed locally.
+  `useSysFonts` falls back to canvas-measurement probing of common
+  Japanese/Latin families when the Font Access API is missing,
+  denied, or returns nothing. Saved documents keep working — old
+  values like `'sans-serif'` still resolve as valid stacks. The
+  document default changed to a Noto Serif JP-based Mincho stack.
+- Archive extension `.slm` → `.chsmf` (N-23): "cucul hart silim
+  murlun format", same migration as Kusuma's `.chkpf`. Open accepts
+  both extensions, Save always writes `.chsmf`, the zip internals
+  and `doc.json` are unchanged, and old `.slm` drafts/documents
+  still load. The internal `DraftRec.slm` field name is kept for
+  compatibility. i18n, READMEs, the guide, the spec, and the site
+  pages were updated.
+- Document-wide find (N-25): Ctrl+F or the "検" menu item opens a
+  floating find bar. Matches are collected across every chain with
+  a plain `indexOf` scan, `↑`/`↓` step through them with wraparound,
+  and each hit selects the containing area, centers it if off-screen,
+  and moves the chain pane's selection to the hit position. Typing
+  jumps to the first match immediately. Search only — no replace yet.
+- Page nav `≫` (N-26): a last-page button joins ≪ ＜ ＞.
+- CRLF normalization (N-30): `\r\n` and lone `\r` are normalized to
+  `\n` both when loading archives and when chain text is edited, so
+  pasted Windows line endings can't disturb splitting/measuring.
+
+### 日本語
+
+Kusuma Plava 追従まとめ取り込み — フォント選択・書庫拡張子・
+全文検索・ページナビ ≫・改行コード正規化。
+
+- フォント同梱（OFL）: Noto Sans JP（japanese+latin・400/700）と
+  Noto Sans（latin+latin-ext・400/700・italic）を @font-face で
+  バンドル — どのマシンでも同一の字形・字幅になり、サンプル
+  文書や PDF 出力の見た目が揃う。欧文用に Noto Sans を使う
+  「欧文」プリセットを追加。OFL 本文は `licenses/` に同梱
+- フォント選択の拡張（N-22）: 4箇所の書体セレクト（文書既定・
+  エリア・一括・範囲マーク）を共通 `FontPick` へ統一し3層化 —
+  CSS スタック付き推奨プリセット（明朝・ゴシック・教科書体・
+  丸ゴシック・汎用）＋システムフォント列挙＋カスタム自由入力
+  （未所持は ⚠ 警告）。Font Access API が無い/拒否/空応答の
+  環境では canvas 計測プローブで代表フォントを列挙する
+  フォールバック。旧書庫の `'sans-serif'` 等は有効なスタック
+  としてそのまま読める。文書既定は Noto Serif JP 系明朝スタックへ
+- 書庫拡張子 `.slm` → `.chsmf`（N-23）: cucul hart silim murlun
+  format。kusuma の .chkpf 移行と同方式 — 開くは `.chsmf,.slm`
+  両対応、保存は .chsmf のみ、zip 内部構造と doc.json は不変。
+  旧 .slm 書庫・旧下書きはそのまま読める。内部の
+  `DraftRec.slm` フィールド名は互換のため維持。i18n・README・
+  ガイド・仕様・サイトも更新
+- 全文検索（N-25）: Ctrl+F またはメニュー「検」でフローティング
+  find バーを開き、全連鎖を indexOf で横断走査。↑↓で周回移動
+  し、ヒットを含むエリアを選択＋画面外なら中央寄せ＋連鎖ペインの
+  選択範囲をヒット位置へ移動。入力中は即座に最初の一致へ。
+  検索のみ — 置換は別版で検討（N-33）
+- ページナビ `≫`（N-26）: ≪ ＜ ＞ に最終ページボタンを追加
+- CRLF 正規化（N-30）: 書庫読込と連鎖テキスト編集の入口で
+  `\r\n`・孤立 `\r` を `\n` へ正規化 — 貼り付け由来の
+  Windows 改行で分割・計測が揺れないようにする
+
 ## [0.9.0] - 2026-11-03
 
 ### English

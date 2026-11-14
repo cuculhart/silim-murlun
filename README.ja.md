@@ -21,9 +21,10 @@ English: [README.md](README.md)
 - **画像** — ファイル選択→実寸ゴースト→クリック配置。mm 編集とアスペクト比ロック（角ドラッグでライブ拘束）
 - **複数選択ワークフロー** — Ctrl+D・Ctrl+C/V で複製・コピペ、クリックスルー編集つきグルーピング、整列・分布
 - **テキスト装飾** — フォント・サイズ・太字/斜体/下線/色、単独エリアの横揃え・縦揃え
+- **フォント同梱** — Noto Sans JP（和文）と Noto Sans（欧文）を SIL OFL でバンドル。どのマシンでも同じ見た目になり、システムフォントやカスタム名も引き続き選べます
 - **Undo / Redo** — doc＋連鎖＋ページ＋設定の統合スナップショット（Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y）
 - **実寸印刷** — アプリ内プレビューとブラウザ印刷メニューの両方に対応、`@page` 動的設定・ページ番号フッター
-- **.slm 書庫** — zip 形式（doc.json＋画像バイナリ）。完全ローカルで外部送信なし
+- **.chsmf 書庫** — zip 形式（doc.json＋画像バイナリ）。完全ローカルで外部送信なし。旧形式 `.slm` の読み込みも可能
 - **日本語・英語 UI**、4テーマ、5mm 方眼＋10mm 主線・スナップ（Alt で一時解除）
 
 ## 使い方
@@ -53,6 +54,12 @@ React 19 + TypeScript + Vite + [Kimetron Isle](https://github.com/cuculhart/kime
 | 複製 | Ctrl+D または Ctrl+C/V — グリッド1段ずれで配置、設定を引き継ぐ |
 | 整列 | 複数選択 → プロパティの「整列・分布」 |
 | 印刷 | 「印刷」メニュー → プレビュー → ブラウザ印刷 |
+
+## ライセンス
+
+アプリには **Noto Sans JP**・**Noto Sans**（Google Fonts、Fontsource 経由）を
+SIL Open Font License 1.1 で同梱しています。ライセンス本文は
+`app/public/licenses/` に含まれます。
 
 ## 名前の由来
 

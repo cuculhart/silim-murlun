@@ -1,15 +1,92 @@
 // 連鎖編集ペイン — 右ペインの連鎖テキスト欄。
 // 編集対象は常に連鎖テキスト1本（エリア内直接編集は持たない）。
 // IME 確定・キャレット維持・順序崩れの問題が構造的に消える設計。
-// 選択範囲への部分装飾（TextMark）とインストール済みフォント列挙を持つ。
+// 選択範囲への部分装飾（TextMark）とフォント選択（FontPick）を持つ。
 
-import { useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { sliceRuns, type Chain, type TextAttrs } from 'inimbal';
 import type { TFunc } from './i18n';
 import { tf } from './i18n';
 import type { TextAreaData } from './types';
 import { DEFAULT_TEXT_DATA, FONT_SIZES_MM } from './types';
-import { fontOptions, useSysFonts } from './useSysFonts';
+import { FontPick } from './FontPick';
+
+// textarea のキャレット位置へスクロールする — ブラウザの
+// caret-into-view は環境依存で効かないため、同じスタイルの
+// 不可視 div で文字位置を実測して scrollTop を直接設定する
+// （kusuma-plava ChainPane と同じ textarea-caret-position 定番手法）
+const scrollTaToCaret = (el: HTMLTextAreaElement, pos: number) => {
+  const div = document.createElement('div');
+  const cs = getComputedStyle(el);
+  // textarea-caret-position 定番のプロパティ一式 — フォント
+  // メトリクス・パディング・ラップ挙動を完全に揃えないと
+  // 長文では行数ぶん誤差が蓄積する
+  const props = [
+    'borderTopWidth',
+    'borderRightWidth',
+    'borderBottomWidth',
+    'borderLeftWidth',
+    'borderStyle',
+    'paddingTop',
+    'paddingRight',
+    'paddingBottom',
+    'paddingLeft',
+    'fontStyle',
+    'fontVariant',
+    'fontWeight',
+    'fontStretch',
+    'fontSize',
+    'fontSizeAdjust',
+    'lineHeight',
+    'fontFamily',
+    'textAlign',
+    'textTransform',
+    'textIndent',
+    'textDecoration',
+    'letterSpacing',
+    'wordSpacing',
+    'tabSize',
+    'fontKerning',
+    'fontFeatureSettings',
+    'fontVariantEastAsian',
+    'textRendering',
+    'wordBreak',
+    'overflowWrap',
+    'lineBreak',
+    'direction',
+    'unicodeBidi',
+    'textSizeAdjust',
+  ];
+  for (const p of props) div.style.setProperty(p, cs.getPropertyValue(p));
+  // 幅は css width ではなく clientWidth − padding を使う —
+  // 縦スクロールバー分の差で折返し位置が変わる
+  const padL = parseFloat(cs.paddingLeft) || 0;
+  const padR = parseFloat(cs.paddingRight) || 0;
+  div.style.boxSizing = 'content-box';
+  div.style.width = `${el.clientWidth - padL - padR}px`;
+  div.style.whiteSpace = 'pre-wrap';
+  if (!cs.overflowWrap || cs.overflowWrap === 'normal')
+    div.style.overflowWrap = 'break-word';
+  div.style.position = 'absolute';
+  div.style.visibility = 'hidden';
+  div.textContent = el.value.slice(0, pos);
+  const marker = document.createElement('span');
+  marker.textContent = el.value.slice(pos, pos + 1) || 'x';
+  div.appendChild(marker);
+  // 全文を入れて総高さを比べ、比率で位置を自己補正する —
+  // 環境差で発生する折返しの系統的誤差は el/div の
+  // scrollHeight 比で打ち消せる（pos までの部分だけでは
+  // 比較できないため全文が必須）
+  div.appendChild(document.createTextNode(el.value.slice(pos + 1)));
+  document.body.appendChild(div);
+  const ratio =
+    div.scrollHeight > 0 ? el.scrollHeight / div.scrollHeight : 1;
+  el.scrollTop = Math.max(
+    0,
+    marker.offsetTop * ratio - el.clientHeight / 2,
+  );
+  div.remove();
+};
 
 export function ChainPane({
   chain,
@@ -21,6 +98,8 @@ export function ChainPane({
   onClearMarks,
   onAreaData,
   onClose,
+  jumpSel,
+  onJumpApplied,
   t,
 }: {
   chain: Chain;
@@ -33,13 +112,36 @@ export function ChainPane({
   onClearMarks: (s: number, e: number) => void;
   onAreaData: (patch: Partial<TextAreaData>) => void;
   onClose: () => void;
+  /** v0.10: 全文検索ジャンプ — App 側がヒット位置の選択範囲を投げる。
+      chainId がこのペインの連鎖と一致したときだけ適用する */
+  jumpSel?: { s: number; e: number; n: number; chainId: string } | null;
+  /** jumpSel を適用し終えたら呼ぶ（App 側で要求をクリアするため） */
+  onJumpApplied?: () => void;
   t: TFunc;
 }) {
   const taRef = useRef<HTMLTextAreaElement>(null);
   // 選択範囲はボタン押下でフォーカスが外れても保持するため state で記憶
   const [sel, setSel] = useState<{ s: number; e: number }>({ s: 0, e: 0 });
   const [markColor, setMarkColor] = useState('#222222');
-  const sysFonts = useSysFonts();
+
+  // 全文検索ジャンプ — ヒット位置の選択範囲を適用してスクロール。
+  // フォーカスは移さない（find バーの入力欄で打ち続けられるように）
+  const lastJump = useRef(0);
+  useLayoutEffect(() => {
+    const el = taRef.current;
+    if (
+      !el ||
+      !jumpSel ||
+      jumpSel.chainId !== chain.id ||
+      jumpSel.n === lastJump.current
+    )
+      return;
+    lastJump.current = jumpSel.n;
+    scrollTaToCaret(el, jumpSel.s);
+    el.selectionStart = jumpSel.s;
+    el.selectionEnd = jumpSel.e;
+    onJumpApplied?.();
+  }, [jumpSel, chain.id]);
 
   // 選択開始位置の実効色（マーク後勝ち → エリア既定へフォールバック）
   const colorAt = (pos: number) => {
@@ -63,8 +165,6 @@ export function ChainPane({
   const hasSel = sel.e > sel.s;
   const apply = (attrs: Partial<TextAttrs>) =>
     hasSel && onApplyMark(sel.s, sel.e, attrs);
-  // 既定3種 + インストール済みフォント（queryLocalFonts が取れた場合）
-  const fonts = fontOptions(sysFonts);
 
   return (
     <aside className="chain-pane">
@@ -133,23 +233,14 @@ export function ChainPane({
             </option>
           ))}
         </select>
-        <select
+        <FontPick
           className="chain-marks-font"
-          disabled={!hasSel}
           value=""
-          title={t('chain.markFont')}
-          onChange={(e) => {
-            if (e.currentTarget.value)
-              apply({ fontFamily: e.currentTarget.value });
-          }}
-        >
-          <option value="">{t('chain.markFont')}</option>
-          {fonts.map((f) => (
-            <option key={f} value={f}>
-              {f}
-            </option>
-          ))}
-        </select>
+          placeholder={t('chain.markFont')}
+          disabled={!hasSel}
+          onPick={(stack) => apply({ fontFamily: stack })}
+          t={t}
+        />
         <input
           className="chain-marks-link"
           type="url"
@@ -175,21 +266,12 @@ export function ChainPane({
         <div className="chain-font">
           <label>
             {t('chain.font')}
-            <select
+            <FontPick
               className="chain-font-family"
               value={areaData.fontFamily}
-              onChange={(e) =>
-                onAreaData({ fontFamily: e.currentTarget.value })
-              }
-            >
-              {[...new Set([areaData.fontFamily, ...fonts])].map(
-                (f) => (
-                  <option key={f} value={f}>
-                    {f}
-                  </option>
-                ),
-              )}
-            </select>
+              onPick={(stack) => onAreaData({ fontFamily: stack })}
+              t={t}
+            />
           </label>
           <label>
             {t('chain.size')}

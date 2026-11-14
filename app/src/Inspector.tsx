@@ -15,7 +15,7 @@ import { tf } from './i18n';
 import { ChainPane } from './ChainPane';
 import type { ImageData, TextAreaData } from './types';
 import { FONT_SIZES_MM, IMG_KIND, MM_PX, TEXT_KIND } from './types';
-import { fontOptions, useSysFonts } from './useSysFonts';
+import { FontPick } from './FontPick';
 
 const isShape = (o: WorldObject) =>
   o.kind === 'rect' || isShapeKind(o.kind);
@@ -155,6 +155,8 @@ export function RightDock({
   onAddArea,
   collapsed,
   onToggleDock,
+  jumpSel,
+  onJumpApplied,
   docProps,
   t,
 }: {
@@ -177,6 +179,9 @@ export function RightDock({
   onAddArea: () => void;
   collapsed: boolean;
   onToggleDock: () => void;
+  /** v0.10: 全文検索ジャンプ — ChainPane へそのまま渡す */
+  jumpSel?: { s: number; e: number; n: number; chainId: string } | null;
+  onJumpApplied?: () => void;
   docProps: {
     title: string;
     onTitle: (s: string) => void;
@@ -215,6 +220,8 @@ export function RightDock({
           onClearMarks={onClearMarks}
           onAreaData={onAreaData}
           onClose={onDeselect}
+          jumpSel={jumpSel}
+          onJumpApplied={onJumpApplied}
           t={t}
         />
         <div className="sub-props">
@@ -359,7 +366,6 @@ function FontBatch({
   onApply: (patch: Partial<TextAreaData>) => void;
   t: TFunc;
 }) {
-  const fonts = fontOptions(useSysFonts());
   return (
     <div className="doc-props">
       <header>
@@ -368,16 +374,12 @@ function FontBatch({
       <div className="doc-props-grid">
         <label>
           {t('chain.font')}
-          <select
-            defaultValue=""
-            onChange={(e) => onApply({ fontFamily: e.currentTarget.value })}
-          >
-            {fonts.map((f) => (
-              <option key={f} value={f}>
-                {f}
-              </option>
-            ))}
-          </select>
+          <FontPick
+            value=""
+            placeholder="—"
+            onPick={(stack) => onApply({ fontFamily: stack })}
+            t={t}
+          />
         </label>
         <label>
           {t('chain.size')}
@@ -679,7 +681,6 @@ function DocProps({
   t: TFunc;
 }) {
   const [ins, setIns] = useState(1);
-  const fonts = fontOptions(useSysFonts());
   return (
     <div className="doc-props">
       <header>
@@ -745,13 +746,7 @@ function DocProps({
         </label>
         <label>
           {t('doc.font')}
-          <select value={font} onChange={(e) => onFont(e.currentTarget.value)}>
-            {[...new Set([font, ...fonts])].map((f) => (
-              <option key={f} value={f}>
-                {f}
-              </option>
-            ))}
-          </select>
+          <FontPick value={font} onPick={onFont} t={t} />
         </label>
       </div>
       <footer className="hint">{t('doc.hint')}</footer>

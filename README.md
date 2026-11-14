@@ -23,9 +23,10 @@ See [CHANGELOG](CHANGELOG.md) for the release history.
 - **Images** — file pick → true-size ghost → click to place; mm editing and aspect-ratio lock (live corner-drag constraint)
 - **Multi-selection workflow** — Ctrl+D / Ctrl+C/V duplicate & copy-paste, grouping with click-through member editing, align & distribute
 - **Text styling** — font, size, bold/italic/underline/color, and horizontal/vertical alignment on standalone areas
+- **Bundled fonts** — Noto Sans JP (Japanese) and Noto Sans (Latin) ship with the app under the SIL OFL, so documents look identical on every machine; system fonts and custom names remain selectable
 - **Undo / Redo** — unified snapshots of doc + chains + pages + settings (Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y)
 - **True-size printing** — in-app print preview plus the browser's own print dialog; dynamic `@page` and page-number footer
-- **.slm archives** — zip format (doc.json + image binaries). Fully local — nothing is sent anywhere
+- **.chsmf archives** — zip format (doc.json + image binaries). Fully local — nothing is sent anywhere. Older `.slm` archives still open
 - **UI in English & Japanese**, 4 themes, 5mm grid + 10mm majors with snapping (Alt disables)
 
 ## Getting started
@@ -56,6 +57,12 @@ layer + fflate.
 | Duplicate | Ctrl+D or Ctrl+C/V — grids-step offset, keeps style |
 | Align | Multi-select → Align & distribute in the inspector |
 | Print | "Print" menu → preview → browser print |
+
+## Licenses
+
+Silim Murlun bundles **Noto Sans JP** and **Noto Sans** (Google Fonts,
+via Fontsource) under the SIL Open Font License 1.1 — see
+`app/public/licenses/` for the license texts shipped with the app.
 
 ## Name
 

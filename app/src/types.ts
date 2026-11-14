@@ -40,9 +40,18 @@ export interface TextAreaData {
   link?: string;
 }
 
+/** アプリ既定フォント — 先頭の 'Noto Sans JP' はアプリ同梱（OFL、
+    main.tsx の @font-face）なので、全マシンで同一の字形・字幅に
+    なる。無い環境（ロード失敗・@font-face 未適用の外部閲覧等）は
+    OS のゴシック系へ落ちる。Debian の fonts-noto-cjk ファミリ名は
+    "Noto Sans CJK JP" で "Noto Sans JP" とは別名のため併記。
+    （CSS フォントスタックとして保存・計測・印刷でそのまま使う） */
+export const DEFAULT_FONT_STACK =
+  "'Noto Sans JP', 'Noto Sans CJK JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'Yu Gothic', sans-serif";
+
 export const DEFAULT_TEXT_DATA: TextAreaData = {
   fontSize: 4,
-  fontFamily: 'sans-serif',
+  fontFamily: DEFAULT_FONT_STACK,
   color: '#222222',
 };
 

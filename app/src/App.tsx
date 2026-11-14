@@ -34,7 +34,7 @@ import { PageNav } from './PageNav';
 import { Printout } from './Printout';
 import { Rulers } from './Rulers';
 import { makeT, tf, type Lang } from './i18n';
-import { packArchive, unpackArchive } from './docio';
+import { ARCHIVE_EXT, packArchive, unpackArchive } from './docio';
 import { clearDraft, loadDraft, saveDraft } from './autosave';
 import { createCanvasMeasurer } from './measure';
 import {
@@ -162,7 +162,19 @@ export function App() {
   // 起動時の下書き確認が済むまで自動保存を走らせない
   // （確認前に空ドキュメントを保存して下書きを上書きするのを防ぐ）
   const draftReadyRef = useRef(false);
-  const [docFont, setDocFont] = useState('sans-serif');
+  // v0.10: 全文検索（全連鎖横断・検索のみ。置換は持たない）
+  const [findOpen, setFindOpen] = useState(false);
+  const [findQ, setFindQ] = useState('');
+  const [findIdx, setFindIdx] = useState(-1);
+  // 検索ヒット → 連鎖ペインの選択範囲への橋渡し（n は適用回数）
+  const [jumpSel, setJumpSel] = useState<{
+    s: number;
+    e: number;
+    n: number;
+    chainId: string;
+  } | null>(null);
+  const jumpSeqRef = useRef(0);
+  const [docFont, setDocFont] = useState(DEFAULT_TEXT_DATA.fontFamily);
   type Snap = {
     objects: WorldObject[];
     chains: Chain[];
@@ -255,6 +267,13 @@ export function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = document.activeElement as HTMLElement | null;
+      // v0.10: Ctrl+F はアプリの全文検索を開く（入力欄でも横取り —
+      // ブラウザのページ内検索は本アプリでは機能しないため）
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        setFindOpen(true);
+        return;
+      }
       if (t && ['TEXTAREA', 'INPUT', 'SELECT'].includes(t.tagName)) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         e.preventDefault();
@@ -300,6 +319,7 @@ export function App() {
         setSelLink(null);
         setCtxMenu(null);
         setAboutOpen(false);
+        setFindOpen(false);
         setShapeTool(null);
         setShapeDrag(null);
         if (engine.mode === 'shape') engine.cancelShapeDraw();
@@ -429,7 +449,7 @@ export function App() {
     if (r) removePage(r.id);
   };
 
-  // ── ファイル操作（.slm 書庫） ──
+  // ── ファイル操作（.chsmf 書庫） ──
   const contentObjects = () =>
     engine.doc.objects.filter((o) => o.kind !== PAGE_KIND);
 
@@ -530,7 +550,7 @@ export function App() {
           footer: true,
           title: '',
           pageOpacity: 50,
-          docFont: 'sans-serif',
+          docFont: DEFAULT_TEXT_DATA.fontFamily,
         };
         const cur = {
           model: r.model,
@@ -539,7 +559,7 @@ export function App() {
           footer: r.footer,
           title: r.title,
           pageOpacity: r.pageOpacity,
-          docFont: r.docFont ?? 'sans-serif',
+          docFont: r.docFont ?? DEFAULT_TEXT_DATA.fontFamily,
         };
         if (JSON.stringify(blank) === JSON.stringify(cur)) return;
         applyArchive(r);
@@ -636,7 +656,7 @@ export function App() {
     setFooter(true);
     setDocTitle('');
     setPageOpacity(50);
-    setDocFont('sans-serif');
+    setDocFont(DEFAULT_TEXT_DATA.fontFamily);
     createdAtRef.current = new Date().toISOString();
     // v0.9: 文書が切り替わった時点で fp を更新 — 旧文書の
     // 下書きが残っていても次回起動で誤復元しない
@@ -664,7 +684,9 @@ export function App() {
       }),
     );
     a.href = url;
-    a.download = name.endsWith('.slm') ? name : `${name}.slm`;
+    a.download = name.endsWith(ARCHIVE_EXT)
+      ? name
+      : `${name}${ARCHIVE_EXT}`;
     a.click();
     URL.revokeObjectURL(url);
     dirtyRef.current = false;
@@ -692,11 +714,17 @@ export function App() {
     });
     groupSeqRef.current = gn + 1;
     commitPages(r.model, objects);
-    setChains(r.chains);
+    // v0.10: 改行コードを LF へ正規化（旧書庫・外部由来の \r\n を吸収）
+    setChains(
+      r.chains.map((c) => ({
+        ...c,
+        text: c.text.replace(/\r\n?/g, '\n'),
+      })),
+    );
     setFooter(r.footer);
     setDocTitle(r.title);
     setPageOpacity(r.pageOpacity);
-    setDocFont(r.docFont ?? 'sans-serif');
+    setDocFont(r.docFont ?? DEFAULT_TEXT_DATA.fontFamily);
     createdAtRef.current = r.createdAt || new Date().toISOString();
     // v0.9: 下書き fingerprint を開いた文書へ更新（下書き復元
     // 経路でも同一 fp になるため二重書きは害なし）
@@ -1204,6 +1232,91 @@ export function App() {
   };
   const goToPage = (i: number) => focusPage(i);
 
+  // ── v0.10: 全文検索 — 全連鎖を indexOf で素朴に横断走査 ──
+  const collectHits = (q: string) => {
+    const out: { chainId: string; pos: number }[] = [];
+    if (!q) return out;
+    for (const c of chains) {
+      for (
+        let i = c.text.indexOf(q);
+        i >= 0;
+        i = c.text.indexOf(q, i + Math.max(1, q.length))
+      )
+        out.push({ chainId: c.id, pos: i });
+    }
+    return out;
+  };
+  const findHits = collectHits(findQ);
+
+  // ヒットを含むスライスのエリアを選択し、連鎖ペインへ選択範囲を
+  // 投げる。あふれ分のヒットは末尾スライスのエリアへ帰着させる
+  const jumpHit = (chainId: string, pos: number, len: number) => {
+    const c = chains.find((x) => x.id === chainId);
+    const lr = layouts.get(chainId);
+    const sl =
+      lr?.slices.find(
+        (s) => pos >= s.offset && pos < s.offset + s.text.length,
+      ) ?? lr?.slices[lr.slices.length - 1];
+    const areaId = sl?.areaId ?? c?.areas[0];
+    if (!areaId) return;
+    const o = engine.doc.objects.find((x) => x.id === areaId);
+    engine.setSelection([areaId]);
+    if (o) {
+      const el = canvasRef.current;
+      if (el) {
+        // ヒット頁が画面外なら中央へ寄せる（ズームは変えない）
+        const u = MM_PX * engine.viewport.zoom;
+        const sx = o.x * u + engine.viewport.x;
+        const sy = o.y * u + engine.viewport.y;
+        const sw = o.w * u;
+        const sh = o.h * u;
+        if (
+          sx < 0 ||
+          sy < 0 ||
+          sx + sw > el.clientWidth ||
+          sy + sh > el.clientHeight
+        ) {
+          engine.viewport.x += el.clientWidth / 2 - (sx + sw / 2);
+          engine.viewport.y += el.clientHeight / 2 - (sy + sh / 2);
+          engine.panBy(0, 0);
+        }
+        // アクティブページもヒットのある頁へ揃える
+        const pi = pageRects(model.spec, model.pages).findIndex(
+          (p) =>
+            o.x + o.w / 2 >= p.x &&
+            o.x + o.w / 2 < p.x + p.w &&
+            o.y + o.h / 2 >= p.y &&
+            o.y + o.h / 2 < p.y + p.h,
+        );
+        if (pi >= 0 && pi !== curPage) setActivePage(pi);
+      }
+    }
+    setJumpSel({
+      s: pos,
+      e: pos + len,
+      n: ++jumpSeqRef.current,
+      chainId,
+    });
+  };
+  const pickHit = (i: number) => {
+    const h = findHits[i];
+    if (!h) return;
+    setFindIdx(i);
+    jumpHit(h.chainId, h.pos, findQ.length);
+  };
+  const findNext = () => {
+    if (findHits.length)
+      pickHit(findIdx < 0 ? 0 : (findIdx + 1) % findHits.length);
+  };
+  const findPrev = () => {
+    if (findHits.length)
+      pickHit(
+        findIdx < 0
+          ? findHits.length - 1
+          : (findIdx - 1 + findHits.length) % findHits.length,
+      );
+  };
+
   // 「下書き HH:MM」表示用の時刻整形
   const fmtTime = (iso: string) => {
     const d = new Date(iso);
@@ -1362,6 +1475,7 @@ export function App() {
           rulerOn={rulerOn}
           onRuler={() => setRulerOn((v) => !v)}
           onFit={() => focusPage(curPage)}
+          onFind={() => setFindOpen(true)}
           linkMode={linkMode}
           onLinkMode={() => {
             setLinkMode((m) => !m);
@@ -1685,6 +1799,69 @@ export function App() {
             onGo={goToPage}
             t={t}
           />
+          {/* v0.10: 全文検索バー — 全連鎖横断（検索のみ） */}
+          {findOpen && (
+            <div className="find-bar">
+              <input
+                className="find-q"
+                value={findQ}
+                placeholder={t('find.placeholder')}
+                autoFocus
+                onChange={(e) => {
+                  const v = e.currentTarget.value;
+                  setFindQ(v);
+                  setFindIdx(-1);
+                  // 入力中も最初の一致へジャンプ（ブラウザの
+                  // ページ内検索と同じ感覚）
+                  if (v) {
+                    const hits = collectHits(v);
+                    if (hits.length) {
+                      setFindIdx(0);
+                      jumpHit(hits[0].chainId, hits[0].pos, v.length);
+                    }
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (e.shiftKey) findPrev();
+                    else findNext();
+                  }
+                  if (e.key === 'Escape') setFindOpen(false);
+                }}
+              />
+              <span className="find-count">
+                {tf(
+                  t,
+                  'find.count',
+                  findIdx >= 0 && findIdx < findHits.length
+                    ? findIdx + 1
+                    : '–',
+                  findHits.length,
+                )}
+              </span>
+              <button
+                title={t('find.prev')}
+                disabled={!findHits.length}
+                onClick={findPrev}
+              >
+                ↑
+              </button>
+              <button
+                title={t('find.next')}
+                disabled={!findHits.length}
+                onClick={findNext}
+              >
+                ↓
+              </button>
+              <button
+                title={t('chain.close')}
+                onClick={() => setFindOpen(false)}
+              >
+                ×
+              </button>
+            </div>
+          )}
           {/* N-19: 上下スクロール（ホイールパン不慣れ対策のフローティングUI） */}
           <div className="scroll-nav">
             <button
@@ -1730,19 +1907,21 @@ export function App() {
           chainOverflow={
             selChain ? (layouts.get(selChain.id)?.overflow ?? '') : ''
           }
-          onChainText={(text) =>
+          onChainText={(text) => {
+            // v0.10: 貼り付け由来の \r\n を LF へ正規化してから保持
+            const nt = text.replace(/\r\n?/g, '\n');
             setChains((cs) =>
               cs.map((c) =>
                 c.id === selChain!.id
                   ? {
                       ...c,
-                      text,
-                      marks: adjustMarksForEdit(c.marks, c.text, text),
+                      text: nt,
+                      marks: adjustMarksForEdit(c.marks, c.text, nt),
                     }
                   : c,
               ),
-            )
-          }
+            );
+          }}
           onApplyMark={(s, e, attrs) =>
             setChains((cs) =>
               cs.map((c) =>
@@ -1777,6 +1956,8 @@ export function App() {
           onReorder={(op) => engine.reorderSelected(op)}
           onAlign={onAlign}
           onDeselect={() => engine.setSelection([])}
+          jumpSel={jumpSel}
+          onJumpApplied={() => setJumpSel(null)}
           collapsed={dockCollapsed}
           onToggleDock={() => setDockCollapsed((v) => !v)}
           onAddArea={() => {
@@ -1897,7 +2078,7 @@ export function App() {
       <input
         ref={openFileRef}
         type="file"
-        accept=".slm"
+        accept={`${ARCHIVE_EXT},.slm`}
         style={{ display: 'none' }}
         onChange={onOpenFile}
       />
@@ -2062,7 +2243,7 @@ export function App() {
                     if (e.key === 'Enter') confirmSave(saveDlg);
                   }}
                 />
-                .slm
+                {ARCHIVE_EXT}
               </label>
             </div>
             <div className="btns">

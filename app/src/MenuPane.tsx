@@ -28,6 +28,7 @@ export function MenuPane({
   rulerOn,
   onRuler,
   onFit,
+  onFind,
   linkMode,
   onLinkMode,
   shapeTool,
@@ -55,6 +56,8 @@ export function MenuPane({
   rulerOn: boolean;
   onRuler: () => void;
   onFit: () => void;
+  /** v0.10: 全文検索バーを開く */
+  onFind: () => void;
   linkMode: boolean;
   onLinkMode: () => void;
   shapeTool: ShapeTool | null;
@@ -119,6 +122,11 @@ export function MenuPane({
       {item('枠', t('menu.fit'), onFit, {
         title: t('menu.fitTip'),
         enIc: 'F',
+      })}
+      {/* v0.10: 全文検索（Ctrl+F でも開く） */}
+      {item('検', t('menu.find'), onFind, {
+        title: t('find.open'),
+        enIc: 'Q',
       })}
       <div className="m-sep" />
       {item('鎖', t('menu.link'), onLinkMode, {
