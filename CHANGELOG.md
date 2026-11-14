@@ -9,14 +9,14 @@
 Kinsoku line-break rules (push-out only), find & replace, and a
 layout memo so non-layout changes stop re-measuring.
 
-- Kinsoku — push-out only (N-24): a new "禁則処理 / Line-break
-  rules" document setting (`なし / 追い出し`) adjusts line-break
-  points inside `fit()`. When the next line would start with a
-  head-forbidden char (、。・brackets-closing・small kana・
-  `-+/#%_` etc.) or the current line would end with an
-  end-forbidden char (open brackets, hyphen), the break point is
-  pulled back by up to 2 characters — the same boundary rule as
-  Kusuma Plava's vertical typesetting. No hanging/condensed
+- Kinsoku — push-out only (N-24): a new "Line-break rules"
+  document setting (Off / Push-out) adjusts line-break points
+  inside `fit()`. When the next line would start with a
+  head-forbidden char (Japanese punctuation, closing brackets,
+  small kana, `-+/#%_` etc.) or the current line would end with
+  an end-forbidden char (open brackets, hyphen), the break point
+  is pulled back by up to 2 characters — the same boundary rule
+  as Kusuma Plava's vertical typesetting. No hanging/condensed
   kinsoku. The character tables live in `inimbal/src/kinsoku.ts`,
   and the horizontal break loop was extracted there as `fitText`
   (metrics injected) so inimbal unit tests cover the kinsoku
@@ -25,8 +25,8 @@ layout memo so non-layout changes stop re-measuring.
   exact old layout. New documents default to push-out. The value
   is saved in archives, undo snapshots, and drafts.
 - Find & replace (N-33): the find bar gains a replace input plus
-  "置換 / 全置換" buttons (Kusuma `replaceOne/replaceAll` parity).
-  Replacements go through the chain-text path, so mark
+  "Replace" / "All" buttons (Kusuma `replaceOne/replaceAll`
+  parity). Replacements go through the chain-text path, so mark
   coordinates are kept by `adjustMarksForEdit`, and the selection
   lands on the replaced text via the existing jumpSel bridge.
 - Layout signature memo (N-28): each chain's `layoutChain`
