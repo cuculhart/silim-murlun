@@ -634,6 +634,73 @@ body,
   cursor: pointer;
 }
 
+/* ── v0.13: 書式（スタイル）一覧 — 文書プロパティ内 ── */
+.style-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.style-list > header {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.style-def-head {
+  display: flex;
+  gap: 6px;
+}
+
+.style-def-name {
+  flex: 1;
+  min-width: 0;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+.style-def-head button,
+.style-list > button,
+.chain-font button {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 1px 8px;
+  cursor: pointer;
+}
+
+.style-def-props {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.style-def-props label {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+
+.style-def-props select,
+.style-def-props input {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+/* 書式行は chain-font の折返しレイアウトで1行専有させる */
+.chain-style {
+  flex: 1 1 100%;
+}
+
 .img-lock {
   display: flex;
   gap: 6px;

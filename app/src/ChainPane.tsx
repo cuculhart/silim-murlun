@@ -7,7 +7,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { sliceRuns, type Chain, type TextAttrs } from 'inimbal';
 import type { TFunc } from './i18n';
 import { tf } from './i18n';
-import type { TextAreaData } from './types';
+import type { FontStyleDef, TextAreaData } from './types';
 import { DEFAULT_TEXT_DATA, FONT_SIZES_MM } from './types';
 import { FontPick } from './FontPick';
 
@@ -100,6 +100,9 @@ export function ChainPane({
   onClose,
   jumpSel,
   onJumpApplied,
+  styles,
+  onApplyStyle,
+  onRegisterStyle,
   t,
 }: {
   chain: Chain;
@@ -117,6 +120,10 @@ export function ChainPane({
   jumpSel?: { s: number; e: number; n: number; chainId: string } | null;
   /** jumpSel を適用し終えたら呼ぶ（App 側で要求をクリアするため） */
   onJumpApplied?: () => void;
+  /** v0.13: 書式一覧と適用・登録（areaData のあるときだけ表示） */
+  styles: FontStyleDef[];
+  onApplyStyle: (styleId?: string) => void;
+  onRegisterStyle: () => void;
   t: TFunc;
 }) {
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -264,6 +271,34 @@ export function ChainPane({
       </div>
       {areaData && (
         <div className="chain-font">
+          {/* v0.13: 書式 — 適用中の書式 id を表示。解除は書式なし。
+              「現在の書式を登録」でエリア書式を新規書式化する */}
+          <label className="chain-style">
+            {t('style.title')}
+            <select
+              value={areaData.style ?? ''}
+              onChange={(e) =>
+                onApplyStyle(e.currentTarget.value || undefined)
+              }
+            >
+              <option value="">{t('style.none')}</option>
+              {styles.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+              {/* 削除済み等で未解決の id も値として残す */}
+              {areaData.style &&
+                !styles.some((s) => s.id === areaData.style) && (
+                  <option value={areaData.style}>
+                    {areaData.style}
+                  </option>
+                )}
+            </select>
+          </label>
+          <button onClick={onRegisterStyle}>
+            {t('style.addFromArea')}
+          </button>
           <label>
             {t('chain.font')}
             <FontPick

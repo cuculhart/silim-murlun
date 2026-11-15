@@ -38,6 +38,37 @@ export interface TextAreaData {
   halign?: 'left' | 'center' | 'right';
   /** エリア全体の URL リンク（印刷/PDF で <a> 化） */
   link?: string;
+  /** v0.13: 適用中の書式 id（FontStyleDef.id）。未設定 = 書式なし */
+  style?: string;
+}
+
+/** 書式（スタイル）のプロパティ部 — エリアへ適用できる書式属性。
+    link はコンテンツ属性のため含めない。halign/valign は連鎖
+    エリアでは描画上無効だが単独エリアでは有効（「見出し=中央
+    揃え」等が表現できる） */
+export type StyleProps = Partial<
+  Pick<
+    TextAreaData,
+    | 'fontFamily'
+    | 'fontSize'
+    | 'color'
+    | 'bold'
+    | 'italic'
+    | 'underline'
+    | 'halign'
+    | 'valign'
+  >
+>;
+
+/** v0.13: 名前付き書式（Word のスタイル相当）。文書データとして
+    書庫へ保存される。適用はエリアへ props を書込み + style id を
+    記録し、書式側の編集は適用中の全エリアへ再反映される
+    （リンク型 — 直接書式による手動変更は再反映で上書きされる） */
+export interface FontStyleDef {
+  /** 不変 id（rename しても適用リンクは維持される） */
+  id: string;
+  name: string;
+  props: StyleProps;
 }
 
 /** アプリ既定フォント — 先頭の 'Noto Sans JP' はアプリ同梱（OFL、
@@ -54,6 +85,43 @@ export const DEFAULT_TEXT_DATA: TextAreaData = {
   fontFamily: DEFAULT_FONT_STACK,
   color: '#222222',
 };
+
+/** 既定書式セット — 新規文書と styles 欠落の旧書庫へシードする。
+    表示名は生成時のロケールで焼き付ける（以後は文書データとして
+    ユーザーが編集可能）。適用時の決定性のため props は全項目を
+    明示値で持つ（未指定プロパティは適用時に現値が残るため） */
+export function defaultStyles(
+  nameOf: (key: string) => string,
+): FontStyleDef[] {
+  const base: StyleProps = {
+    fontFamily: DEFAULT_FONT_STACK,
+    fontSize: 4,
+    color: '#222222',
+    bold: false,
+    italic: false,
+    underline: false,
+    halign: 'left',
+    valign: 'top',
+  };
+  return [
+    { id: 'std', name: nameOf('style.std'), props: { ...base } },
+    {
+      id: 'h1',
+      name: nameOf('style.h1'),
+      props: { ...base, fontSize: 9, bold: true },
+    },
+    {
+      id: 'h2',
+      name: nameOf('style.h2'),
+      props: { ...base, fontSize: 7, bold: true },
+    },
+    {
+      id: 'h3',
+      name: nameOf('style.h3'),
+      props: { ...base, fontSize: 5, bold: true },
+    },
+  ];
+}
 
 export const FONT_SIZES_MM = [3, 4, 5, 7, 9];
 export const FONT_FAMILIES = [

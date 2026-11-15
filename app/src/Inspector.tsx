@@ -13,7 +13,12 @@ import type { Chain, KinsokuMode, TextAttrs } from 'inimbal';
 import type { TFunc } from './i18n';
 import { tf } from './i18n';
 import { ChainPane } from './ChainPane';
-import type { ImageData, TextAreaData } from './types';
+import type {
+  FontStyleDef,
+  ImageData,
+  StyleProps,
+  TextAreaData,
+} from './types';
 import { FONT_SIZES_MM, IMG_KIND, MM_PX, TEXT_KIND } from './types';
 import { FontPick } from './FontPick';
 
@@ -157,6 +162,10 @@ export function RightDock({
   onToggleDock,
   jumpSel,
   onJumpApplied,
+  styles,
+  textTargetCount,
+  onApplyStyle,
+  onRegisterStyle,
   docProps,
   t,
 }: {
@@ -170,6 +179,14 @@ export function RightDock({
   onClearMarks: (s: number, e: number) => void;
   onAreaData: (patch: Partial<TextAreaData>) => void;
   onAreaDataAll: (patch: Partial<TextAreaData>) => void;
+  /** v0.13: 書式一覧（適用 select・登録ボタン用） */
+  styles: FontStyleDef[];
+  /** 選択内（グループ含む）のテキストエリア数 — 書式適用行の出現条件 */
+  textTargetCount: number;
+  /** 選択中テキストエリア全てへ書式を適用（undefined = 解除） */
+  onApplyStyle: (styleId?: string) => void;
+  /** 単独選択エリアの現行書式を新しい書式として登録する */
+  onRegisterStyle: () => void;
   onRect: (r: { x: number; y: number; w: number; h: number }) => void;
   onImageData: (patch: Partial<ImageData>) => void;
   onStyle: (patch: StylePatch) => void;
@@ -202,6 +219,11 @@ export function RightDock({
     /** v0.11: 禁則処理 — なし / 追い出し（書庫に保存） */
     kinsoku?: KinsokuMode;
     onKinsoku: (k: KinsokuMode | undefined) => void;
+    /** v0.13: 書式一覧の管理（文書プロパティの書式セクション） */
+    styles: FontStyleDef[];
+    onStyleAdd: (name: string, props: StyleProps) => FontStyleDef;
+    onStyleUpdate: (id: string, patch: Partial<FontStyleDef>) => void;
+    onStyleDelete: (id: string) => void;
   };
   t: TFunc;
 }) {
@@ -225,6 +247,9 @@ export function RightDock({
           onClose={onDeselect}
           jumpSel={jumpSel}
           onJumpApplied={onJumpApplied}
+          styles={styles}
+          onApplyStyle={onApplyStyle}
+          onRegisterStyle={onRegisterStyle}
           t={t}
         />
         <div className="sub-props">
@@ -284,7 +309,14 @@ export function RightDock({
       />
     );
   } else if (allText && selObjs.length > 1) {
-    body = <FontBatch onApply={onAreaDataAll} t={t} />;
+    body = (
+      <FontBatch
+        onApply={onAreaDataAll}
+        styles={styles}
+        onApplyStyle={onApplyStyle}
+        t={t}
+      />
+    );
   } else if (shapes.length === selObjs.length && selObjs.length > 0) {
     body = (
       <ShapeProps objs={selObjs} onStyle={onStyle} onReorder={onReorder} t={t} />
@@ -300,6 +332,21 @@ export function RightDock({
     );
   } else {
     body = <DocProps {...docProps} t={t} />;
+  }
+  // v0.13: 書式適用行 — 連鎖ペイン/FontBatch が既に書式 select を
+  // 持つ場合は出さない。それ以外（図形・混在選択など）で選択内に
+  // テキストエリア（グループ経由含む）があれば末尾へ追加する
+  const showStyleApply =
+    textTargetCount > 0 &&
+    !(one?.kind === TEXT_KIND && chain) &&
+    !(allText && selObjs.length > 1);
+  if (showStyleApply) {
+    body = (
+      <>
+        {body}
+        <StyleApply styles={styles} onApplyStyle={onApplyStyle} t={t} />
+      </>
+    );
   }
   if (selObjs.length > 1) {
     body = (
@@ -362,11 +409,71 @@ function ImageProps({
   );
 }
 
+/** v0.13: 書式適用のプルダウン — 選択した時点で適用し、表示は
+    常に先頭の案内へ戻る適用アクション型。対象は呼出し側が決める */
+function StyleSelect({
+  styles,
+  onPick,
+  t,
+}: {
+  styles: FontStyleDef[];
+  onPick: (styleId?: string) => void;
+  t: TFunc;
+}) {
+  return (
+    <select
+      value=""
+      onChange={(e) => {
+        const v = e.currentTarget.value;
+        if (v) onPick(v === 'none' ? undefined : v);
+      }}
+    >
+      <option value="" disabled>
+        {t('style.apply')}
+      </option>
+      <option value="none">{t('style.none')}</option>
+      {styles.map((s) => (
+        <option key={s.id} value={s.id}>
+          {s.name}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+/** v0.13: 選択内のテキストエリア（グループ経由含む）への書式適用行 —
+    図形・混在選択時に Inspector 末尾へ追加される */
+function StyleApply({
+  styles,
+  onApplyStyle,
+  t,
+}: {
+  styles: FontStyleDef[];
+  onApplyStyle: (styleId?: string) => void;
+  t: TFunc;
+}) {
+  return (
+    <div className="doc-props">
+      <div className="doc-props-grid">
+        <label>
+          {t('style.title')}
+          <StyleSelect styles={styles} onPick={onApplyStyle} t={t} />
+        </label>
+      </div>
+      <footer className="hint">{t('style.applyHint')}</footer>
+    </div>
+  );
+}
+
 function FontBatch({
   onApply,
+  styles,
+  onApplyStyle,
   t,
 }: {
   onApply: (patch: Partial<TextAreaData>) => void;
+  styles: FontStyleDef[];
+  onApplyStyle: (styleId?: string) => void;
   t: TFunc;
 }) {
   return (
@@ -375,6 +482,10 @@ function FontBatch({
         <span>{t('font.batch')}</span>
       </header>
       <div className="doc-props-grid">
+        <label>
+          {t('style.title')}
+          <StyleSelect styles={styles} onPick={onApplyStyle} t={t} />
+        </label>
         <label>
           {t('chain.font')}
           <FontPick
@@ -428,6 +539,160 @@ function FontBatch({
         </label>
       </div>
       <footer className="hint">{t('font.batchHint')}</footer>
+    </div>
+  );
+}
+
+/** v0.13: 書式一覧の管理 — 文書プロパティ内の書式セクション。
+    プルダウンで対象書式を切替え、選択中の1件だけ名前・プロパティを
+    編集する（全展開だと小さい画面で見切れるため）。props 変更は
+    適用中の全エリアへ即時再反映される（リンク型） */
+function StyleList({
+  styles,
+  docFont,
+  onAdd,
+  onUpdate,
+  onDelete,
+  t,
+}: {
+  styles: FontStyleDef[];
+  docFont: string;
+  onAdd: (name: string, props: StyleProps) => FontStyleDef;
+  onUpdate: (id: string, patch: Partial<FontStyleDef>) => void;
+  onDelete: (id: string) => void;
+  t: TFunc;
+}) {
+  // 選択中の書式 id — 削除等で未解決なら先頭へフォールバック
+  const [cur, setCur] = useState('');
+  const sel = styles.find((s) => s.id === cur) ?? styles[0];
+  const upd = (props: StyleProps) => sel && onUpdate(sel.id, { props });
+  return (
+    <div className="style-list">
+      <header>
+        <span>{t('style.title')}</span>
+      </header>
+      <div className="style-def-head">
+        <select
+          className="style-def-name"
+          value={sel?.id ?? ''}
+          onChange={(e) => setCur(e.currentTarget.value)}
+        >
+          {styles.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+        <button
+          title={t('style.del')}
+          disabled={!sel}
+          onClick={() => sel && onDelete(sel.id)}
+        >
+          ×
+        </button>
+      </div>
+      {sel && (
+        <div className="style-def-props">
+          <input
+            className="style-def-name"
+            value={sel.name}
+            title={t('style.name')}
+            onChange={(e) => onUpdate(sel.id, { name: e.currentTarget.value })}
+          />
+          <FontPick
+            value={sel.props.fontFamily ?? ''}
+            onPick={(v) => upd({ fontFamily: v })}
+            t={t}
+          />
+          <select
+            value={sel.props.fontSize ?? 4}
+            onChange={(e) =>
+              upd({ fontSize: Number(e.currentTarget.value) })
+            }
+          >
+            {FONT_SIZES_MM.map((sz) => (
+              <option key={sz} value={sz}>
+                {sz}mm
+              </option>
+            ))}
+          </select>
+          <input
+            type="color"
+            title={t('font.color')}
+            value={sel.props.color ?? '#222222'}
+            onChange={(e) => upd({ color: e.currentTarget.value })}
+          />
+          <label title="Bold">
+            B
+            <input
+              type="checkbox"
+              checked={!!sel.props.bold}
+              onChange={(e) => upd({ bold: e.currentTarget.checked })}
+            />
+          </label>
+          <label title="Italic">
+            I
+            <input
+              type="checkbox"
+              checked={!!sel.props.italic}
+              onChange={(e) => upd({ italic: e.currentTarget.checked })}
+            />
+          </label>
+          <label title="Underline">
+            U
+            <input
+              type="checkbox"
+              checked={!!sel.props.underline}
+              onChange={(e) => upd({ underline: e.currentTarget.checked })}
+            />
+          </label>
+          <select
+            title={t('ta.halign')}
+            value={sel.props.halign ?? 'left'}
+            onChange={(e) =>
+              upd({
+                halign: e.currentTarget.value as TextAreaData['halign'],
+              })
+            }
+          >
+            <option value="left">{t('ta.left')}</option>
+            <option value="center">{t('ta.center')}</option>
+            <option value="right">{t('ta.right')}</option>
+          </select>
+          <select
+            title={t('ta.valign')}
+            value={sel.props.valign ?? 'top'}
+            onChange={(e) =>
+              upd({
+                valign: e.currentTarget.value as TextAreaData['valign'],
+              })
+            }
+          >
+            <option value="top">{t('ta.top')}</option>
+            <option value="middle">{t('ta.middle')}</option>
+            <option value="bottom">{t('ta.bottom')}</option>
+          </select>
+        </div>
+      )}
+      <button
+        className="ins-btn"
+        onClick={() =>
+          setCur(
+            onAdd(tf(t, 'style.newName', styles.length + 1), {
+              fontFamily: docFont,
+              fontSize: 4,
+              color: '#222222',
+              bold: false,
+              italic: false,
+              underline: false,
+              halign: 'left',
+              valign: 'top',
+            }).id,
+          )
+        }
+      >
+        {t('style.add')}
+      </button>
     </div>
   );
 }
@@ -666,6 +931,10 @@ function DocProps({
   onFont,
   kinsoku,
   onKinsoku,
+  styles,
+  onStyleAdd,
+  onStyleUpdate,
+  onStyleDelete,
   t,
 }: {
   title: string;
@@ -685,6 +954,10 @@ function DocProps({
   onFont: (s: string) => void;
   kinsoku?: KinsokuMode;
   onKinsoku: (k: KinsokuMode | undefined) => void;
+  styles: FontStyleDef[];
+  onStyleAdd: (name: string, props: StyleProps) => FontStyleDef;
+  onStyleUpdate: (id: string, patch: Partial<FontStyleDef>) => void;
+  onStyleDelete: (id: string) => void;
   t: TFunc;
 }) {
   const [ins, setIns] = useState(1);
@@ -773,6 +1046,14 @@ function DocProps({
           </select>
         </label>
       </div>
+      <StyleList
+        styles={styles}
+        docFont={font}
+        onAdd={onStyleAdd}
+        onUpdate={onStyleUpdate}
+        onDelete={onStyleDelete}
+        t={t}
+      />
       <footer className="hint">{t('doc.hint')}</footer>
     </div>
   );

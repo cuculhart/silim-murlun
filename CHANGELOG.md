@@ -2,6 +2,63 @@
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-15
+
+### English
+
+Named text styles — register reusable format sets in the document
+and apply them to text areas, Word-style.
+
+- Styles (N-13): documents gain a style list (`ArchiveDoc.styles`,
+  seeded with Normal / Heading 1-3 for new documents and archives
+  that lack the field). Each style bundles font family, size,
+  color, bold/italic/underline, and halign/valign. Applying a
+  style writes its properties into the area and records
+  `TextAreaData.style` — unset means "(No style)". Styles are
+  linked: editing a style re-applies it to every area that uses
+  it (direct formatting made afterwards is overwritten on the
+  next style edit). Renaming keeps the link; deleting clears the
+  reference on applied areas.
+- Apply UI: a style select in the chain pane for a single area
+  (including "Save current as style" to register the area's
+  format as a new style), and the same select in the batch panel
+  for multi-selected text areas. The target set also reaches text
+  areas inside selected non-text objects via their group — picking
+  a heading bar (shape + text group) or several such groups in one
+  click applies the style to the contained text without entering
+  the group. Style management lives in a "Styles" section of the
+  document properties (pulldown selector, rename, per-style
+  property editor, add, delete).
+- Persistence: `styles` rides the same path as `docFont`/`kinsoku`
+  — archives, undo snapshots, and autosave drafts all keep it.
+  Old archives without the field open with the seeded defaults
+  and look unchanged.
+
+### 日本語
+
+名前付き書式 — 定型書式セットを文書内に登録し、テキスト
+エリアへ Word のスタイル感覚で適用する。
+
+- 書式（N-13）: 文書が書式一覧を持つ（`ArchiveDoc.styles`
+  — 新規文書と欠落した旧書庫には 標準/見出し1-3 をシード）。
+  各書式はフォント・サイズ・色・B/I/U・halign/valign を束ねる。
+  適用はエリアへプロパティを書込み `TextAreaData.style` に
+  id を記録 — 未設定は「書式なし」。リンク型: 書式を編集
+  すると適用中の全エリアへ自動再反映（適用後の手動変更は
+  次の書式編集で上書きされる）。名前変更はリンク維持、
+  削除は参照をクリア
+- 適用 UI: 単独エリアは連鎖ペインの書式 select（「現在の
+  書式を登録」でエリア書式を新規書式化も可）、複数選択は
+  一括パネルの書式 select。適用対象は選択した非テキスト
+  オブジェクトの同グループのテキストエリアにも及ぶ —
+  見出し枠（図形＋テキストのグループ）や複数グループを
+  1クリックで選んで、その中のテキストへ直接書式適用できる。
+  管理は文書プロパティの「書式」セクション（プルダウン
+  切替・改名・プロパティ編集・追加・削除）
+- 永続化: `styles` は docFont/kinsoku と同じ経路 — 書庫・
+  Undo・下書きで保持される。フィールド欠落の旧書庫は既定
+  セットがシードされ、見た目は変わらない
+
 ## [0.12.0] - 2026-11-15
 
 ### English

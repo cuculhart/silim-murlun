@@ -41,6 +41,7 @@ import { clearDraft, loadDraft, saveDraft } from './autosave';
 import { createCanvasMeasurer } from './measure';
 import {
   DEFAULT_TEXT_DATA,
+  defaultStyles,
   IMG_KIND,
   LINE_HEIGHT,
   liveRect,
@@ -48,7 +49,9 @@ import {
   PAGE_KIND,
   TEXT_KIND,
   TEXT_PAD_MM,
+  type FontStyleDef,
   type ImageData,
+  type StyleProps,
   type TextAreaData,
 } from './types';
 import './styles.css';
@@ -183,6 +186,11 @@ export function App() {
   const [kinsoku, setKinsoku] = useState<KinsokuMode | undefined>(
     'oidashi',
   );
+  // v0.13: 書式（スタイル）一覧 — 文書データ。欠落の旧書庫は
+  // 既定セットをシードする（見た目への影響はない）
+  const [styles, setStyles] = useState<FontStyleDef[]>(() =>
+    defaultStyles(t),
+  );
   type Snap = {
     objects: WorldObject[];
     chains: Chain[];
@@ -192,6 +200,7 @@ export function App() {
     pageOpacity: number;
     docFont: string;
     kinsoku?: KinsokuMode;
+    styles: FontStyleDef[];
   };
   const histRef = useRef<{ past: Snap[]; future: Snap[]; last: number }>({
     past: [],
@@ -481,6 +490,7 @@ export function App() {
     pageOpacity,
     docFont,
     kinsoku,
+    styles,
   });
   const applySnap = (s: Snap) => {
     applyingRef.current = true;
@@ -499,6 +509,7 @@ export function App() {
     setPageOpacity(s.pageOpacity);
     setDocFont(s.docFont);
     setKinsoku(s.kinsoku);
+    setStyles(s.styles);
     snapRef.current = s;
     applyingRef.current = false;
   };
@@ -538,7 +549,7 @@ export function App() {
     }
     snapRef.current = makeSnap();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engine.doc.objects, chains, model, footer, docTitle, pageOpacity, docFont, kinsoku]);
+  }, [engine.doc.objects, chains, model, footer, docTitle, pageOpacity, docFont, kinsoku, styles]);
 
   // 未保存変更があるときの離脱警告
   useEffect(() => {
@@ -572,6 +583,7 @@ export function App() {
           pageOpacity: 50,
           docFont: DEFAULT_TEXT_DATA.fontFamily,
           kinsoku: 'oidashi',
+          styles: defaultStyles(t),
         };
         const cur = {
           model: r.model,
@@ -583,6 +595,7 @@ export function App() {
           docFont: r.docFont ?? DEFAULT_TEXT_DATA.fontFamily,
           // フィールド欠落の旧下書きは既定と等価扱い（誤復元しない）
           kinsoku: r.kinsoku ?? 'oidashi',
+          styles: r.styles ?? defaultStyles(t),
         };
         if (JSON.stringify(blank) === JSON.stringify(cur)) return;
         applyArchive(r);
@@ -615,6 +628,7 @@ export function App() {
           pageOpacity,
           docFont,
           kinsoku,
+          styles,
         });
         const fp = docFp(createdAtRef.current, docTitle);
         void saveDraft(u8, fp).then((at) => {
@@ -627,7 +641,7 @@ export function App() {
     }, 1500);
     return () => window.clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engine.doc.objects, chains, model, footer, docTitle, pageOpacity, docFont, kinsoku]);
+  }, [engine.doc.objects, chains, model, footer, docTitle, pageOpacity, docFont, kinsoku, styles]);
 
   // F24: Alt 押下でスナップ（グリッド＋オブジェクト吸着）を一時解除
   useEffect(() => {
@@ -682,6 +696,7 @@ export function App() {
     setPageOpacity(50);
     setDocFont(DEFAULT_TEXT_DATA.fontFamily);
     setKinsoku('oidashi');
+    setStyles(defaultStyles(t));
     createdAtRef.current = new Date().toISOString();
     // v0.9: 文書が切り替わった時点で fp を更新 — 旧文書の
     // 下書きが残っていても次回起動で誤復元しない
@@ -702,6 +717,7 @@ export function App() {
       pageOpacity,
       docFont,
       kinsoku,
+      styles,
     });
     const a = document.createElement('a');
     const url = URL.createObjectURL(
@@ -752,6 +768,9 @@ export function App() {
     setPageOpacity(r.pageOpacity);
     setDocFont(r.docFont ?? DEFAULT_TEXT_DATA.fontFamily);
     setKinsoku(r.kinsoku); // 欠落 = なし（旧書庫は旧レイアウト再現）
+    // v0.13: 書式 — 欠落の旧書庫は既定セットをシード（適用しない
+    // 限り見た目に影響しない）
+    setStyles(r.styles ?? defaultStyles(t));
     createdAtRef.current = r.createdAt || new Date().toISOString();
     // v0.9: 下書き fingerprint を開いた文書へ更新（下書き復元
     // 経路でも同一 fp になるため二重書きは害なし）
@@ -983,6 +1002,107 @@ export function App() {
     const o = engine.doc.objects.find((x) => x.id === id);
     if (!o) return;
     patchObject(id, { data: { ...(o.data as ImageData), ...patch } });
+  };
+
+  // ── v0.13: 書式（スタイル）— 文書内の名前付き書式セット。
+  // 適用はエリアへ props 書込み + style id 記録。書式側の編集は
+  // 適用中の全エリアへ再反映するリンク型（Word のスタイル相当） ──
+  const styleSeqRef = useRef(1);
+  const freshStyleId = () => {
+    const used = new Set(styles.map((s) => s.id));
+    let n = styleSeqRef.current;
+    while (used.has(`u${n}`)) n++;
+    styleSeqRef.current = n + 1;
+    return `u${n}`;
+  };
+  /** エリアへ書式を適用（undefined = 書式解除 — props は残る） */
+  const applyStyleTo = (ids: string[], styleId?: string) => {
+    const def = styles.find((s) => s.id === styleId);
+    for (const id of ids)
+      patchAreaData(
+        id,
+        def ? { ...def.props, style: def.id } : { style: undefined },
+      );
+  };
+  /** 書式・一括書式の適用対象 — 選択中のテキストエリアに加え、
+      選択した非テキストオブジェクト（緑バー矩形等）と同グループの
+      テキストエリアも含める。見出し枠グループを1クリックで選んで
+      書式適用する用途。テキストを直接選んだ場合はそのエリアのみ */
+  const textTargetsOf = (objs: WorldObject[]) => {
+    const ids = new Set<string>();
+    for (const o of objs) {
+      if (o.kind === TEXT_KIND) {
+        ids.add(o.id);
+      } else if (o.group) {
+        for (const x of engine.doc.objects)
+          if (x.kind === TEXT_KIND && x.group === o.group) ids.add(x.id);
+      }
+    }
+    return [...ids];
+  };
+  const addStyleDef = (name: string, props: StyleProps) => {
+    const def: FontStyleDef = { id: freshStyleId(), name, props };
+    setStyles((ss) => [...ss, def]);
+    return def;
+  };
+  /** 書式の編集 — props 変更時は適用中の全エリアへ再反映する
+      （直接書式による手動変更はここで上書きされる） */
+  const updateStyleDef = (id: string, patch: Partial<FontStyleDef>) => {
+    const next = styles.map((s) =>
+      s.id === id
+        ? { ...s, ...patch, props: { ...s.props, ...(patch.props ?? {}) } }
+        : s,
+    );
+    setStyles(next);
+    if (!patch.props) return;
+    const def = next.find((s) => s.id === id)!;
+    engine.setDoc({
+      ...engine.doc,
+      objects: engine.doc.objects.map((o) =>
+        o.kind === TEXT_KIND && (o.data as TextAreaData).style === id
+          ? {
+              ...o,
+              data: {
+                ...DEFAULT_TEXT_DATA,
+                ...(o.data as TextAreaData),
+                ...def.props,
+              },
+            }
+          : o,
+      ),
+    });
+  };
+  /** 書式の削除 — 参照中エリアの style をクリア（書式なしへ） */
+  const deleteStyleDef = (id: string) => {
+    setStyles((ss) => ss.filter((s) => s.id !== id));
+    engine.setDoc({
+      ...engine.doc,
+      objects: engine.doc.objects.map((o) =>
+        o.kind === TEXT_KIND && (o.data as TextAreaData).style === id
+          ? {
+              ...o,
+              data: { ...(o.data as TextAreaData), style: undefined },
+            }
+          : o,
+      ),
+    });
+  };
+  /** 指定エリアの現行書式を新しい書式として登録し、そのエリアへ適用 */
+  const registerStyleFrom = (areaId: string) => {
+    const o = engine.doc.objects.find((x) => x.id === areaId);
+    if (!o || o.kind !== TEXT_KIND) return;
+    const d = { ...DEFAULT_TEXT_DATA, ...(o.data as TextAreaData) };
+    const def = addStyleDef(tf(t, 'style.newName', styles.length + 1), {
+      fontFamily: d.fontFamily,
+      fontSize: d.fontSize,
+      color: d.color,
+      bold: d.bold,
+      italic: d.italic,
+      underline: d.underline,
+      halign: d.halign,
+      valign: d.valign,
+    });
+    patchAreaData(areaId, { style: def.id });
   };
 
   // ── F25: 複製・コピー＆ペースト（テキストエリアは対象外） ──
@@ -2067,10 +2187,16 @@ export function App() {
           }
           onAreaData={(patch) => selObj && patchAreaData(selObj.id, patch)}
           onAreaDataAll={(patch) =>
-            selObjs
-              .filter((o) => o.kind === TEXT_KIND)
-              .forEach((o) => patchAreaData(o.id, patch))
+            textTargetsOf(selObjs).forEach((id) =>
+              patchAreaData(id, patch),
+            )
           }
+          styles={styles}
+          textTargetCount={textTargetsOf(selObjs).length}
+          onApplyStyle={(sid) =>
+            applyStyleTo(textTargetsOf(selObjs), sid)
+          }
+          onRegisterStyle={() => selObj && registerStyleFrom(selObj.id)}
           onRect={(r) => selObj && patchObject(selObj.id, r)}
           onImageData={(patch) => selObj && patchImageData(selObj.id, patch)}
           onStyle={(patch) =>
@@ -2133,6 +2259,11 @@ export function App() {
             onFont: setDocFont,
             kinsoku,
             onKinsoku: setKinsoku,
+            styles,
+            onStyleAdd: (name: string, props: StyleProps) =>
+              addStyleDef(name, props),
+            onStyleUpdate: updateStyleDef,
+            onStyleDelete: deleteStyleDef,
           }}
           t={t}
         />
