@@ -86,6 +86,23 @@ export const DEFAULT_TEXT_DATA: TextAreaData = {
   color: '#222222',
 };
 
+/** 文書既定フォントの追従対象を絞る純粋関数 — 書式なしで旧既定の
+    まま残っているテキストエリアへ新既定を書き込んだ配列を返す。
+    エリア単位で書体を変えたもの（fontFamily が旧既定と異なる）や
+    書式適用中のものは温存する（書式側は updateStyleDef が処理） */
+export function followFontObjects(
+  objects: WorldObject[],
+  prev: string,
+  font: string,
+): WorldObject[] {
+  return objects.map((o) => {
+    if (o.kind !== TEXT_KIND) return o;
+    const d = o.data as TextAreaData | undefined;
+    if (!d || d.style || d.fontFamily !== prev) return o;
+    return { ...o, data: { ...d, fontFamily: font } };
+  });
+}
+
 /** 既定書式セット — 新規文書と styles 欠落の旧書庫へシードする。
     表示名は生成時のロケールで焼き付ける（以後は文書データとして
     ユーザーが編集可能）。適用時の決定性のため props は全項目を

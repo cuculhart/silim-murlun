@@ -37,11 +37,13 @@ import { Printout } from './Printout';
 import { Rulers } from './Rulers';
 import { makeT, tf, type Lang } from './i18n';
 import { ARCHIVE_EXT, packArchive, unpackArchive } from './docio';
+import { b64ToU8, basename, isDesktop, sm, u8ToB64 } from './desktop';
 import { clearDraft, loadDraft, saveDraft } from './autosave';
 import { createCanvasMeasurer } from './measure';
 import {
   DEFAULT_TEXT_DATA,
   defaultStyles,
+  followFontObjects,
   IMG_KIND,
   LINE_HEIGHT,
   liveRect,
@@ -157,6 +159,15 @@ export function App() {
   const [histTick, setHistTick] = useState(0);
   const createdAtRef = useRef(new Date().toISOString());
   const dirtyRef = useRef(false);
+  // 直近に文書を丸ごと適用した印 — 新規/開く/復元の直後は
+  // 差分検知で dirty へ戻らないよう次の1回をクリーン扱いにする
+  const cleanNextRef = useRef(false);
+  // デスクトップ: 開いている書庫ファイルのパス（null=未保存先なし）
+  const [docPath, setDocPath] = useState<string | null>(null);
+  // デスクトップ: タイトルバーの * 表示用（dirtyRef のミラー）
+  const [dirtyUi, setDirtyUi] = useState(false);
+  // 起動引数/exeドロップでファイルを開いた印 — 下書き復元より優先する
+  const openedFromPathRef = useRef(false);
   const applyingRef = useRef(false);
   // v0.9: About オーバーレイ
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -286,6 +297,8 @@ export function App() {
       ...engine.doc,
       objects: pageObjects(model),
     });
+    // 初期配置による doc 変化を「編集」として数えない
+    cleanNextRef.current = true;
     syncSnapExtra(engine, model, guidesRef.current);
     focusPage(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -505,6 +518,29 @@ export function App() {
   // ── ファイル操作（.chsmf 書庫） ──
   const contentObjects = () =>
     engine.doc.objects.filter((o) => o.kind !== PAGE_KIND);
+  const packCurrent = () =>
+    packArchive({
+      spec: model.spec,
+      pages: model.pages,
+      objects: contentObjects(),
+      chains,
+      footer,
+      title: docTitle,
+      createdAt: createdAtRef.current,
+      pageOpacity,
+      docFont,
+      kinsoku,
+      styles,
+      guides,
+    });
+
+  // 未保存フラグの一本管理 — ref（beforeunload/保存判定用）・
+  // state（タイトルバー表示用）・メインプロセス（close ガード用）を同期
+  const markDirty = (v: boolean) => {
+    dirtyRef.current = v;
+    setDirtyUi(v);
+    sm?.setDirty(v);
+  };
 
   // ── Undo/Redo（doc＋連鎖＋ページ＋設定の統合スナップショット） ──
   const makeSnap = (): Snap => ({
@@ -564,7 +600,9 @@ export function App() {
       snapRef.current = makeSnap();
       return;
     }
-    dirtyRef.current = true;
+    // 文書全体の適用直後（開く/新規/復元）は差分検知をクリーン扱い
+    if (cleanNextRef.current) cleanNextRef.current = false;
+    else markDirty(true);
     if (applyingRef.current) return;
     const now = Date.now();
     if (now - histRef.current.last > 500) {
@@ -587,6 +625,9 @@ export function App() {
 
   // 未保存変更があるときの離脱警告
   useEffect(() => {
+    // デスクトップはメインプロセス側の close ガードが担う —
+    // beforeunload を張ると保存確認のあとも無言で close が阻まれる
+    if (isDesktop) return;
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
       if (dirtyRef.current) e.preventDefault();
     };
@@ -601,7 +642,7 @@ export function App() {
     let alive = true;
     void loadDraft().then((rec) => {
       draftReadyRef.current = true;
-      if (!alive || !rec) return;
+      if (!alive || !rec || openedFromPathRef.current) return;
       // 別文書の下書きは復元しない — 最後に開いていた文書の
       // fp と不一致ならスキップ（両方無い旧形式は従来どおり）
       const lastFp = localStorage.getItem('silim-docfp');
@@ -653,20 +694,7 @@ export function App() {
     if (!draftReadyRef.current) return;
     const id = window.setTimeout(() => {
       try {
-        const u8 = packArchive({
-          spec: model.spec,
-          pages: model.pages,
-          objects: contentObjects(),
-          chains,
-          footer,
-          title: docTitle,
-          createdAt: createdAtRef.current,
-          pageOpacity,
-          docFont,
-          kinsoku,
-          styles,
-          guides,
-        });
+        const u8 = packCurrent();
         const fp = docFp(createdAtRef.current, docTitle);
         void saveDraft(u8, fp).then((at) => {
           if (at) setDraftAt(at);
@@ -739,25 +767,14 @@ export function App() {
     // v0.9: 文書が切り替わった時点で fp を更新 — 旧文書の
     // 下書きが残っていても次回起動で誤復元しない
     stampDocFp(createdAtRef.current, '');
-    dirtyRef.current = false;
+    cleanNextRef.current = true;
+    markDirty(false);
+    setDocPath(null);
     engine.setSelection([]);
     focusPage(0, m);
   };
   const confirmSave = (name: string) => {
-    const u8 = packArchive({
-      spec: model.spec,
-      pages: model.pages,
-      objects: contentObjects(),
-      chains,
-      footer,
-      title: docTitle,
-      createdAt: createdAtRef.current,
-      pageOpacity,
-      docFont,
-      kinsoku,
-      styles,
-      guides,
-    });
+    const u8 = packCurrent();
     const a = document.createElement('a');
     const url = URL.createObjectURL(
       new Blob([u8.buffer as ArrayBuffer], {
@@ -770,7 +787,7 @@ export function App() {
       : `${name}${ARCHIVE_EXT}`;
     a.click();
     URL.revokeObjectURL(url);
-    dirtyRef.current = false;
+    markDirty(false);
     setSaveDlg(null);
   };
   // 書庫の展開結果をアプリ状態へ反映する（書庫読込と下書き復元で共用）
@@ -816,7 +833,8 @@ export function App() {
     // v0.9: 下書き fingerprint を開いた文書へ更新（下書き復元
     // 経路でも同一 fp になるため二重書きは害なし）
     stampDocFp(createdAtRef.current, r.title);
-    dirtyRef.current = false;
+    cleanNextRef.current = true;
+    markDirty(false);
     engine.setSelection([]);
     focusPage(0, r.model);
   };
@@ -828,6 +846,139 @@ export function App() {
       .then((buf) => applyArchive(unpackArchive(new Uint8Array(buf))))
       .catch((err: Error) => flash(tf(t, 'hint.cantOpen', err.message)));
   };
+
+  // ── デスクトップ（Electron）: ネイティブの開く/保存 ──
+  // ブラウザ配布では sm が未定義 — メニュー側は isDesktop で分岐し、
+  // こちらはブラウザ用の download/input 経路へ残す
+  const saveDesktop = async (forceDialog = false): Promise<boolean> => {
+    if (!sm) return false;
+    try {
+      let p = docPath;
+      if (forceDialog || !p) {
+        p = await sm.saveDialog(
+          `${docTitle || 'document'}${ARCHIVE_EXT}`,
+        );
+        if (!p) return false;
+      } else if (
+        // 既存ファイルの上書きは毎回確認する（取り消し不可のため）
+        !window.confirm(tf(t, 'confirm.overwrite', basename(p)))
+      ) {
+        return false;
+      }
+      await sm.writeFile(p, u8ToB64(packCurrent()));
+      setDocPath(p);
+      markDirty(false);
+      flash(t('hint.saved'));
+      return true;
+    } catch (err) {
+      flash(tf(t, 'hint.saveFail', String(err)));
+      return false;
+    }
+  };
+  const openDesktopPath = async (p: string) => {
+    if (!sm) return;
+    try {
+      const b64 = await sm.readFile(p);
+      openedFromPathRef.current = true;
+      applyArchive(unpackArchive(b64ToU8(b64)));
+      setDocPath(p);
+    } catch (err) {
+      flash(tf(t, 'hint.cantOpen', String(err)));
+    }
+  };
+  const openDesktop = async () => {
+    if (!sm) return;
+    try {
+      const f = await sm.openDialog();
+      if (!f) return;
+      applyArchive(unpackArchive(b64ToU8(f.b64)));
+      setDocPath(f.path);
+    } catch (err) {
+      flash(tf(t, 'hint.cantOpen', String(err)));
+    }
+  };
+  // 一度だけ bind されるデスクトップ初期化エフェクトから
+  // 最新のハンドラを呼ぶための ref（state クロージャの陳腐化対策）
+  const desktopActions = useRef({
+    saveDesktop,
+    openDesktop,
+    openDesktopPath,
+    newDoc,
+    undo,
+    redo,
+  });
+  desktopActions.current = {
+    saveDesktop,
+    openDesktop,
+    openDesktopPath,
+    newDoc,
+    undo,
+    redo,
+  };
+
+  useEffect(() => {
+    const api = sm;
+    if (!api) return;
+    const offMenu = api.onMenu((a) => {
+      const d = desktopActions.current;
+      if (a === 'open') void d.openDesktop();
+      else if (a === 'save' || a === 'save-as')
+        void d.saveDesktop(a === 'save-as');
+      else if (a === 'new') d.newDoc();
+      else if (a === 'undo') d.undo();
+      else if (a === 'redo') d.redo();
+      else if (a === 'print') setPrinting(true);
+      else if (a === 'about') setAboutOpen(true);
+    });
+    const offQuit = api.onSaveForQuit(() => {
+      void desktopActions.current
+        .saveDesktop()
+        .then((ok) => (ok ? api.quitNow() : api.quitAbort()));
+    });
+    const offOpen = api.onOpenPath((p) =>
+      void desktopActions.current.openDesktopPath(p),
+    );
+    void api
+      .takePendingFile()
+      .then((p) => {
+        if (p) void desktopActions.current.openDesktopPath(p);
+      })
+      .catch(() => {});
+    // ウィンドウへのファイルドロップ — Electron 既定はページ遷移なので
+    // 常に抑止し、書庫ファイルならそのまま開く
+    const eat = (e: DragEvent) => e.preventDefault();
+    const onDrop = (e: DragEvent) => {
+      e.preventDefault();
+      const f = e.dataTransfer?.files?.[0];
+      if (!f) return;
+      const p = api.pathForFile(f);
+      if (p && /\.(chsmf|slm)$/i.test(p))
+        void desktopActions.current.openDesktopPath(p);
+    };
+    window.addEventListener('dragover', eat);
+    window.addEventListener('drop', onDrop);
+    return () => {
+      offMenu();
+      offQuit();
+      offOpen();
+      window.removeEventListener('dragover', eat);
+      window.removeEventListener('drop', onDrop);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // デスクトップ: ウィンドウタイトルへ文書名・ファイル名・未保存印を出す
+  useEffect(() => {
+    if (!isDesktop) return;
+    document.title = `${dirtyUi ? '*' : ''}${docTitle || 'document'}${
+      docPath ? ` (${basename(docPath)})` : ''
+    } — Silim Murlun`;
+  }, [docTitle, docPath, dirtyUi]);
+
+  // デスクトップ: OS メニューをアプリ言語へ追従させる
+  useEffect(() => {
+    sm?.setMenuLang(lang);
+  }, [lang]);
 
   // ── テキストエリア生成（用紙上ダブルクリック） ──
   // B-1: ナビクリック→スクロールでカーソル下にページが来て
@@ -1045,6 +1196,16 @@ export function App() {
     patchObject(id, { data: { ...(o.data as ImageData), ...patch } });
   };
 
+  /** 文書既定フォントの追従 — 書式なしで旧既定のまま残っている
+      エリアへ新既定を反映する（followFontObjects が対象を絞る） */
+  const followDocFont = (prev: string, font: string) => {
+    if (prev === font) return;
+    engine.setDoc({
+      ...engine.doc,
+      objects: followFontObjects(engine.doc.objects, prev, font),
+    });
+  };
+
   // ── v0.13: 書式（スタイル）— 文書内の名前付き書式セット。
   // 適用はエリアへ props 書込み + style id 記録。書式側の編集は
   // 適用中の全エリアへ再反映するリンク型（Word のスタイル相当） ──
@@ -1095,6 +1256,14 @@ export function App() {
         : s,
     );
     setStyles(next);
+    // 「標準」の fontFamily は文書既定フォントと同一視する — 書式側の
+    // 編集も既定へ反映し、無書式の既定継承エリアと以後の新規エリアへ
+    // 追従させる（既定フォント側からの変更は applyDocFont が担う）
+    if (id === 'std' && patch.props?.fontFamily) {
+      const f = patch.props.fontFamily;
+      followDocFont(docFont, f);
+      setDocFont(f);
+    }
     if (!patch.props) return;
     const def = next.find((s) => s.id === id)!;
     engine.setDoc({
@@ -1112,6 +1281,18 @@ export function App() {
           : o,
       ),
     });
+  };
+  /** 文書既定フォントの変更 — 新規エリアの既定になるほか、書式
+      「標準」の fontFamily にも同期する（標準 = 文書既定の書式と
+      同一視。適用中エリアへは updateStyleDef が再反映する）。
+      標準の無い文書では、旧既定を継承した無書式エリアだけ追従させる */
+  const applyDocFont = (font: string) => {
+    if (styles.some((s) => s.id === 'std'))
+      updateStyleDef('std', { props: { fontFamily: font } });
+    else {
+      followDocFont(docFont, font);
+      setDocFont(font);
+    }
   };
   /** 書式の削除 — 参照中エリアの style をクリア（書式なしへ） */
   const deleteStyleDef = (id: string) => {
@@ -1841,8 +2022,14 @@ export function App() {
           collapsed={collapsed}
           onToggle={() => setCollapsed((v) => !v)}
           onNew={newDoc}
-          onOpen={() => openFileRef.current?.click()}
-          onSave={() => setSaveDlg(docTitle || 'document')}
+          onOpen={() => {
+            if (isDesktop) void openDesktop();
+            else openFileRef.current?.click();
+          }}
+          onSave={() => {
+            if (isDesktop) void saveDesktop();
+            else setSaveDlg(docTitle || 'document');
+          }}
           onUndo={undo}
           onRedo={redo}
           canUndo={histRef.current.past.length > 0}
@@ -2456,7 +2643,7 @@ export function App() {
             pageOpacity,
             onOpacity: setPageOpacity,
             font: docFont,
-            onFont: setDocFont,
+            onFont: applyDocFont,
             kinsoku,
             onKinsoku: setKinsoku,
             styles,

@@ -9,8 +9,6 @@ English: [README.md](README.md)
 
 ![文書編集画面](doc/screenshot.png)
 
-**[Live demo](https://cuculhart.github.io/silim-murlun/)** — インストール不要・ブラウザだけで動きます
-
 変更履歴は [CHANGELOG](CHANGELOG.md) を参照。
 
 ## 機能
@@ -25,9 +23,20 @@ English: [README.md](README.md)
 - **Undo / Redo** — doc＋連鎖＋ページ＋設定の統合スナップショット（Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y）
 - **実寸印刷** — アプリ内プレビューとブラウザ印刷メニューの両方に対応、`@page` 動的設定・ページ番号フッター
 - **.chsmf 書庫** — zip 形式（doc.json＋画像バイナリ）。完全ローカルで外部送信なし。旧形式 `.slm` の読み込みも可能
+- **デスクトップアプリ** — Electron シェルによりネイティブの開く/保存（Ctrl+S で既知パスへ上書き / Ctrl+Shift+S で名前付け）、exe・ウィンドウへのファイルドロップ、閉じる前の保存確認、UI 言語に追従する OS メニュー
 - **日本語・英語 UI**、4テーマ、5mm 方眼＋10mm 主線・スナップ（Alt で一時解除）
 
-## 使い方
+## 使い方（デスクトップ版）
+
+[Releases](https://github.com/cuculhart/silim-murlun/releases)
+から各 OS 向けの配布物を取得してインストール。
+
+| OS | 配布形式 |
+|---|---|
+| Windows | `-win-x64.zip`（ポータブル — 解凍して `silim-murlun.exe` を実行） |
+| Linux | `.deb` |
+
+## 使い方（開発・ブラウザ版）
 
 ```bash
 git clone --recursive https://github.com/cuculhart/silim-murlun.git
@@ -43,6 +52,22 @@ npm test
 React 19 + TypeScript + Vite + [Kimetron Isle](https://github.com/cuculhart/kimetron)
 （`kimetron/` に submodule として同梱）＋ 文字送り層 [inimbal](inimbal/) ＋ fflate。
 
+## デスクトップ版（Electron）
+
+`desktop/` は Electron シェルの独立 npm パッケージです
+（Electron・forge 依存はブラウザ版 app の依存から分離）。
+
+```bash
+cd desktop
+npm install            # 初回のみ（electron バイナリをDL）
+cd ..
+npm run dev:desktop        # Vite dev + Electron で起動
+npm run package:desktop    # out/ へ unpack 版を出力（ポータブル版）
+npm run make:desktop       # インストーラ作成（Windows=Squirrel / Linux=deb）
+                           # ※配布のポータブル版 zip は package 出力の
+                           #   out/ を手動で圧縮する
+```
+
 ## 基本操作
 
 | やりたいこと | 操作 |
@@ -53,7 +78,7 @@ React 19 + TypeScript + Vite + [Kimetron Isle](https://github.com/cuculhart/kime
 | グループ | 複数選択して右クリック → グループ化 / 解除 |
 | 複製 | Ctrl+D または Ctrl+C/V — グリッド1段ずれで配置、設定を引き継ぐ |
 | 整列 | 複数選択 → プロパティの「整列・分布」 |
-| 印刷 | 「印刷」メニュー → プレビュー → ブラウザ印刷 |
+| 印刷 | 「印刷」メニュー → プレビュー → 印刷ダイアログ |
 
 ## ライセンス
 

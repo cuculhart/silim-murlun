@@ -11,8 +11,6 @@ printing.
 
 ![Editing a document](doc/screenshot.png)
 
-**[Live demo](https://cuculhart.github.io/silim-murlun/)** — runs in your browser, no install
-
 See [CHANGELOG](CHANGELOG.md) for the release history.
 
 ## Features
@@ -27,9 +25,20 @@ See [CHANGELOG](CHANGELOG.md) for the release history.
 - **Undo / Redo** — unified snapshots of doc + chains + pages + settings (Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y)
 - **True-size printing** — in-app print preview plus the browser's own print dialog; dynamic `@page` and page-number footer
 - **.chsmf archives** — zip format (doc.json + image binaries). Fully local — nothing is sent anywhere. Older `.slm` archives still open
+- **Desktop app** — the Electron shell adds native open/save (Ctrl+S overwrite to the current path / Ctrl+Shift+S Save As), file drop on the exe or window, a close guard, and an OS menu that follows the UI language
 - **UI in English & Japanese**, 4 themes, 5mm grid + 10mm majors with snapping (Alt disables)
 
-## Getting started
+## Getting the desktop app
+
+Download a build for your OS from
+[Releases](https://github.com/cuculhart/silim-murlun/releases).
+
+| OS | Distribution |
+|---|---|
+| Windows | `-win-x64.zip` (portable — unzip, then run `silim-murlun.exe`) |
+| Linux | `.deb` |
+
+## Getting started (development / browser version)
 
 ```bash
 git clone --recursive https://github.com/cuculhart/silim-murlun.git
@@ -46,6 +55,22 @@ React 19 + TypeScript + Vite + [Kimetron Isle](https://github.com/cuculhart/kime
 (vendored in `kimetron/` as a submodule) + [inimbal](inimbal/) text-flow
 layer + fflate.
 
+## Desktop (Electron)
+
+`desktop/` is a separate npm package holding the Electron shell
+(Electron/forge deps stay out of the browser app).
+
+```bash
+cd desktop
+npm install            # first time only (downloads the Electron binary)
+cd ..
+npm run dev:desktop        # Vite dev + Electron
+npm run package:desktop    # unpacked build in out/ (the portable zip source)
+npm run make:desktop       # installers (Windows=Squirrel / Linux=deb)
+                           # the shipped Windows portable zip is made by
+                           # manually zipping the contents of out/
+```
+
 ## Basic usage
 
 | Goal | How |
@@ -56,7 +81,7 @@ layer + fflate.
 | Group / ungroup | Right-click a selection → Group / Ungroup |
 | Duplicate | Ctrl+D or Ctrl+C/V — grids-step offset, keeps style |
 | Align | Multi-select → Align & distribute in the inspector |
-| Print | "Print" menu → preview → browser print |
+| Print | "Print" menu → preview → print dialog |
 
 ## Licenses
 

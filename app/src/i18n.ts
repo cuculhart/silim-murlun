@@ -54,6 +54,14 @@ const ja = {
   'font.customPh': 'フォント名',
   'font.missing':
     'この環境にインストールされていないフォントです。既定フォントで表示されます',
+  'font.preset.gothic': 'ゴシック',
+  'font.preset.latin': '欧文',
+  'font.preset.mincho': '明朝',
+  'font.preset.kyokasho': '教科書体',
+  'font.preset.mono': '等幅',
+  'font.preset.sans': 'Sans-serif',
+  'font.preset.serif': 'Serif',
+  'font.preset.monoG': 'Monospace',
 
   // About（v0.9）
   'about.body':
@@ -190,8 +198,11 @@ const ja = {
   'hint.linkFrom': '接続の起点は連鎖の末尾エリアです',
   'hint.linkTo': '接続先は別連鎖の先頭エリアです',
   'hint.cantOpen': '開けません: $1',
+  'hint.saved': '保存しました',
+  'hint.saveFail': '保存できません: $1',
   'hint.draftRestored': '下書きを復元しました',
   'confirm.new': '新規作成します。現在の内容は破棄されます。',
+  'confirm.overwrite': '$1 に上書き保存しますか?',
 
   // ダイアログ・コンテキストメニュー・印刷
   'dlg.filename': 'ファイル名',
@@ -252,6 +263,14 @@ const en: Record<keyof typeof ja, string> = {
   'font.custom': 'Custom…',
   'font.customPh': 'Font name',
   'font.missing': 'Not installed here — falls back to the default font',
+  'font.preset.gothic': 'Gothic',
+  'font.preset.latin': 'Latin',
+  'font.preset.mincho': 'Mincho',
+  'font.preset.kyokasho': 'Textbook',
+  'font.preset.mono': 'Fixed-width',
+  'font.preset.sans': 'Sans-serif',
+  'font.preset.serif': 'Serif',
+  'font.preset.monoG': 'Monospace',
 
   'about.body':
     'A print-first page layout editor — page frames line up on grid paper and you place text, images, and shapes at real-world millimeter size. Link two text areas and overflow text flows on to the next. What you place stays where you placed it.',
@@ -384,8 +403,11 @@ const en: Record<keyof typeof ja, string> = {
   'hint.linkFrom': 'The link source must be the last area of a chain',
   'hint.linkTo': 'The target must be the first area of another chain',
   'hint.cantOpen': "Can't open: $1",
+  'hint.saved': 'Saved',
+  'hint.saveFail': "Can't save: $1",
   'hint.draftRestored': 'Draft restored',
   'confirm.new': 'Create a new document? Current content will be discarded.',
+  'confirm.overwrite': 'Overwrite $1?',
 
   'dlg.filename': 'File name',
   'dlg.save': 'Save',

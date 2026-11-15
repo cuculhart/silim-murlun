@@ -2,6 +2,90 @@
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-15
+
+### English
+
+Desktop app — Silim Murlun now ships as an Electron desktop
+application. The hosted browser demo is retired; the browser
+build itself remains for development.
+
+- `desktop/` — a standalone npm package holding the Electron shell
+  (Electron + electron-forge dev dependencies kept out of the
+  browser app's dependency tree). `npm run dev:desktop` for
+  development; `npm run package:desktop` produces the build that is
+  zipped into the Windows portable distribution, and
+  `npm run make:desktop` builds installers (Windows installer /
+  Linux deb — deb on Linux only)
+- Native open/save — open and save `.chsmf`/`.slm` archives through
+  the OS file dialogs, and overwrite-save (Ctrl+S) to the current
+  path with a confirmation each time. Save As (Ctrl+Shift+S) and
+  Open (Ctrl+O) are available from the menu and shortcuts. The
+  title bar shows the document name, file name, and a `*` unsaved
+  mark
+- Close guard — closing the window with unsaved changes asks
+  "Save and close / Don't save / Cancel"
+- Drop `.chsmf`/`.slm` files onto the exe or the window to open
+  them (forwarded to the running instance; a document passed on
+  launch takes precedence over the autosaved draft)
+- OS application menu — File/Edit/View/Window/Help wired to the
+  same handlers as the in-app menu. The menu language follows the
+  app's ja/en switch
+- Freshly opened/new documents no longer count as modified — the
+  browser version's beforeunload warning stays quiet too
+- The document default font and the "Normal" style font are now the
+  same setting — editing either one applies to the whole document
+  and is inherited by text areas added afterwards. Unstyled areas
+  that still carried the old default follow the change; areas with
+  an explicitly chosen font are left alone
+- Font preset names are localized — the font picker shows English
+  labels (Gothic / Latin / Mincho / Textbook / Fixed-width) in the
+  English UI instead of Japanese
+
+### Fixed
+
+- Workspace dependencies now use `*` — the pinned
+  `inimbal@0.10.0` mismatched the local `0.14.0` and sent
+  `npm install` to the registry
+
+### 日本語
+
+デスクトップアプリ化 — Electron シェルを被せてデスクトップ
+アプリとしてリリース。GitHub Pages デモは畳み、ブラウザ版は
+開発用ビルドとして残す。
+
+- `desktop/` — Electron シェルの独立 npm パッケージ（Electron・
+  forge 依存を app のブラウザ版依存から分離）。開発は
+  `npm run dev:desktop`、配布物は `npm run package:desktop` の
+  出力を zip 化したポータブル版（Windows）と
+  `npm run make:desktop` の deb（Linux）
+- ネイティブの開く/保存 — .chsmf/.slm を OS のダイアログで
+  直接読み書きし、既知のパスへ上書き保存（上書き前に毎回
+  確認）。名前を付けて保存（Ctrl+Shift+S）もメニューと
+  ショートカットで利用可（開く = Ctrl+O）。タイトルバーへ
+  文書名・ファイル名・未保存印 * を表示
+- 閉じる前の保存確認 — 未保存変更がある状態でウィンドウを
+  閉じると「保存して閉じる / 保存せず閉じる / キャンセル」を
+  表示
+- .chsmf/.slm を exe やウィンドウへドロップして開く
+  （既存インスタンスへ転送。起動引数の文書は下書き復元より
+  優先）
+- OS アプリケーションメニュー — ファイル/編集/表示/
+  ウィンドウ/ヘルプを用意し、アプリ内メニューと同じ処理へ
+  接続。メニュー言語はアプリの日英切替に追従
+- 開いた直後・新規直後を未保存扱いしないよう差分検知を調整
+  （ブラウザ版の beforeunload 警告も同様に鳴らなくなる）
+- 文書の既定フォントと書式「標準」のフォントを同一の設定へ統合
+   — どちらを編集しても文書全体へ反映され、以後に作成する
+  テキストエリアへ引き継がれる。旧既定のままの無書式エリアも
+  新しい既定へ追従（個別に書体を変えたエリアは温存）
+- フォントプリセット名をローカライズ — 英語 UI では日本語
+  ラベルではなく英語（Gothic / Latin / Mincho / Textbook /
+  Fixed-width）で表示
+- 修正: workspace 依存を `*` 指定へ — pin していた
+  `inimbal@0.10.0` がローカルの `0.14.0` と不合で
+  `npm install` がレジストリ参照に転じる状態を解消
+
 ## [0.14.0] - 2026-11-15
 
 ### English

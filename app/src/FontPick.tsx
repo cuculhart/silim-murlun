@@ -77,11 +77,12 @@ export function FontPick({
           // 実体名も併記 — 同梱フォント（Noto Sans JP 等）が
           // 「ゴシック」ラベルの裏に隠れて選べない/分からないのを防ぐ。
           // 汎用ファミリ（sans-serif 等）はラベルと同義なので併記しない
+          const label = t(f.label);
           const head = firstFamily(f.stack);
           const text =
-            head.toLowerCase() === f.label.toLowerCase()
-              ? f.label
-              : `${f.label}（${head}）`;
+            head.toLowerCase() === label.toLowerCase()
+              ? label
+              : `${label}（${head}）`;
           return (
             <option key={f.key} value={f.stack} style={{ fontFamily: f.stack }}>
               {text}

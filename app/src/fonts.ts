@@ -4,40 +4,41 @@
 
 import { DEFAULT_FONT_STACK } from './types';
 
+// label は i18n キー（font.preset.* — FontPick が t() で解決する）
 export const FONT_PRESETS: { key: string; label: string; stack: string }[] =
   [
     // 'Noto Sans JP' / 'Noto Sans' はアプリ同梱（OFL）のため
     // どの環境でも同じ字形・字幅になる — プリセットの先頭2件
-    { key: 'gothic', label: 'ゴシック', stack: DEFAULT_FONT_STACK },
+    { key: 'gothic', label: 'font.preset.gothic', stack: DEFAULT_FONT_STACK },
     {
       key: 'latin',
-      label: '欧文',
+      label: 'font.preset.latin',
       stack:
         "'Noto Sans', 'Noto Sans JP', 'Noto Sans CJK JP', 'Hiragino Sans', 'Yu Gothic', sans-serif",
     },
     {
       key: 'mincho',
-      label: '明朝',
+      label: 'font.preset.mincho',
       stack:
         "'Noto Serif JP', 'Noto Serif CJK JP', 'Yu Mincho', 'Hiragino Mincho ProN', serif",
     },
     {
       key: 'kyokasho',
-      label: '教科書体',
+      label: 'font.preset.kyokasho',
       stack:
         "'UD Digi Kyokasho NP-R', 'UD デジタル 教科書体 NP-R', 'UD Digi Kyokasho N-R', 'Hiragino Sans', 'Yu Gothic', 'Noto Sans CJK JP', sans-serif",
     },
     {
       key: 'mono',
-      label: '等幅',
+      label: 'font.preset.mono',
       stack:
         "'Consolas', 'Noto Sans Mono CJK JP', 'BIZ UDGothic', 'Osaka-Mono', monospace",
     },
     // 汎用ファミリ — v0.9 以前の書庫の fontFamily 値（'sans-serif' 等）
     // がカスタム扱いにならないよう、末尾へプリセットとして残す
-    { key: 'sans', label: 'Sans-serif', stack: 'sans-serif' },
-    { key: 'serif', label: 'Serif', stack: 'serif' },
-    { key: 'mono-g', label: 'Monospace', stack: 'monospace' },
+    { key: 'sans', label: 'font.preset.sans', stack: 'sans-serif' },
+    { key: 'serif', label: 'font.preset.serif', stack: 'serif' },
+    { key: 'mono-g', label: 'font.preset.monoG', stack: 'monospace' },
   ];
 
 /** 選択値 → 保存用 font-family 値。プリセットはスタック、カスタム名は
