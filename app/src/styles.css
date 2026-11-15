@@ -1034,7 +1034,6 @@ body,
   z-index: 8;
   background: var(--surface2);
   color: var(--muted);
-  pointer-events: none;
   overflow: hidden;
   font-size: 9px;
 }
@@ -1101,6 +1100,70 @@ body,
 }
 
 .ruler-v .rcur {
+  left: 0;
+  right: 0;
+  height: 1px;
+}
+
+/* ── v0.14: ガイドライン — 全キャンバスを貫く基準線。
+   ヒット帯は見た目より太く（7px）、可視線は ::after の 1px。
+   オブジェクトではないため印刷には出ない ── */
+.guide-v,
+.guide-h {
+  position: absolute;
+  z-index: 7;
+}
+
+.guide-v {
+  top: 0;
+  bottom: 0;
+  width: 7px;
+  cursor: ew-resize;
+}
+
+.guide-h {
+  left: 0;
+  right: 0;
+  height: 7px;
+  cursor: ns-resize;
+}
+
+.guide-v::after,
+.guide-h::after {
+  content: '';
+  position: absolute;
+  background: rgba(0, 170, 190, 0.8);
+}
+
+.guide-v::after {
+  left: 3px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+}
+
+.guide-h::after {
+  top: 3px;
+  left: 0;
+  right: 0;
+  height: 1px;
+}
+
+/* 引き出し・移動中のプレビュー線 */
+.guide-drag {
+  position: absolute;
+  z-index: 7;
+  pointer-events: none;
+  background: rgba(0, 170, 190, 0.6);
+}
+
+.guide-drag.v {
+  top: 0;
+  bottom: 0;
+  width: 1px;
+}
+
+.guide-drag.h {
   left: 0;
   right: 0;
   height: 1px;

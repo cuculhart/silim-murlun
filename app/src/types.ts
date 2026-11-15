@@ -123,6 +123,14 @@ export function defaultStyles(
   ];
 }
 
+/** v0.14: ガイドライン — ユーザーが置く任意位置の基準線（world mm）。
+    v = 縦ガイドの x 座標列、h = 横ガイドの y 座標列。全ページを
+    貫く world 座標で、文書データとして書庫・Undo・下書きへ載る */
+export interface Guides {
+  v: number[];
+  h: number[];
+}
+
 export const FONT_SIZES_MM = [3, 4, 5, 7, 9];
 export const FONT_FAMILIES = [
   { value: 'sans-serif', label: 'Sans-serif' },

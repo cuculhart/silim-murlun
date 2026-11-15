@@ -107,6 +107,8 @@ const ja = {
   'doc.kinsoku.hang': 'ぶら下げ',
   'doc.kinsokuTip':
     '行末の禁則処理の選び方 — 追い出し: 、。などを次の行頭へ送る / ぶら下げ: 句読点を行の規定幅へ1字はみ出して行末を揃える（書庫に保存）',
+  'guide.count': 'ガイド $1 本',
+  'guide.clear': '全削除',
   'style.title': '書式',
   'style.none': '（書式なし）',
   'style.apply': '適用…',
@@ -300,6 +302,8 @@ const en: Record<keyof typeof ja, string> = {
   'doc.kinsoku.hang': 'Hanging',
   'doc.kinsokuTip':
     'Line-end rules — Push-out sends punctuation to the next line to keep it inside the line edge; Hanging lets punctuation overhang the line edge by one char for even line ends (saved in the archive)',
+  'guide.count': '$1 guides',
+  'guide.clear': 'Clear all',
   'style.title': 'Styles',
   'style.none': '(No style)',
   'style.apply': 'Apply…',

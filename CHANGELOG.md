@@ -2,6 +2,60 @@
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-11-15
+
+### English
+
+Guide lines — pull reference lines out of the rulers and snap
+objects to them, as in layout editors.
+
+- Guides (N-10): documents gain `ArchiveDoc.guides`
+  (`{ v: number[]; h: number[] }`, world mm — vertical guides are
+  x coordinates, horizontal guides are y coordinates). Missing in
+  old archives means no guides; new documents start empty. The
+  field rides the same path as `styles` — archives, undo
+  snapshots, and autosave drafts all keep it.
+- Gestures: press on a ruler band and drag a guide onto the
+  canvas (vertical ruler → vertical guide, horizontal ruler →
+  horizontal guide); releasing back onto the ruler cancels.
+  Dragging an existing guide moves it, and dropping it past the
+  ruler-side edge of the active page deletes it. Document
+  properties also gain a "guides / Clear all" row (hidden when
+  there are none). While pulling or moving a guide it snaps to
+  the grid when grid snap is on — Alt gives the raw position.
+- Rendering & snapping: guides are an app-side overlay spanning
+  the whole canvas (thin cyan lines with a wider invisible hit
+  area, resize cursors), so they never print and stay put in
+  world coordinates when pages are added or removed. Their
+  coordinates are appended to `engine.snapExtra`, so object
+  drags, resizes, and multi-selection drags snap to them through
+  the existing snap path — Alt still suppresses snapping
+  globally.
+
+### 日本語
+
+ガイドライン — ルーラーから基準線を引き出し、オブジェクトを
+吸着させる。レイアウトアプリでおなじみのガイド。
+
+- ガイド（N-10）: 文書が `ArchiveDoc.guides` を持つ
+  （`{ v: number[]; h: number[] }` — world mm。縦ガイドは x
+  座標、横ガイドは y 座標）。旧書庫での欠落 = ガイドなし、
+  新規文書は空で始まる。`styles` と同じ経路で書庫・Undo・
+  下書きへ載る
+- 操作: ルーラー帯を押してドラッグでガイドを引き出す
+  （縦ルーラー → 縦ガイド、横ルーラー → 横ガイド）。ルーラー
+  上へ戻して離すとキャンセル。既存ガイドはドラッグで移動、
+  アクティブページのルーラー側辺を越えて離すと削除。文書
+  プロパティには「ガイド N 本 [全削除]」行を追加（0 本の
+  ときは非表示）。引き出し・移動中はグリッド吸着が有効なら
+  5mm 丸め — Alt で生位置
+- 描画とスナップ: ガイドはアプリ側オーバーレイで全キャンバス
+  を貫く細線（透明な太い当たり判定・リサイズカーソル付き）
+  のため印刷へは出ず、ページ追加・削除でも world 座標のまま
+  動かない。座標は `engine.snapExtra` へ併記されるため、
+  オブジェクトのドラッグ・リサイズ・複数選択ドラッグが既存
+  経路で吸着する — Alt 一括解除も従来どおり
+
 ## [0.13.0] - 2026-11-15
 
 ### English

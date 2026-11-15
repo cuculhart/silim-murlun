@@ -224,6 +224,9 @@ export function RightDock({
     onStyleAdd: (name: string, props: StyleProps) => FontStyleDef;
     onStyleUpdate: (id: string, patch: Partial<FontStyleDef>) => void;
     onStyleDelete: (id: string) => void;
+    /** v0.14: ガイド本数（縦+横）と全削除 — 0 本なら行は非表示 */
+    guideCount: number;
+    onGuidesClear: () => void;
   };
   t: TFunc;
 }) {
@@ -935,6 +938,8 @@ function DocProps({
   onStyleAdd,
   onStyleUpdate,
   onStyleDelete,
+  guideCount,
+  onGuidesClear,
   t,
 }: {
   title: string;
@@ -958,6 +963,8 @@ function DocProps({
   onStyleAdd: (name: string, props: StyleProps) => FontStyleDef;
   onStyleUpdate: (id: string, patch: Partial<FontStyleDef>) => void;
   onStyleDelete: (id: string) => void;
+  guideCount: number;
+  onGuidesClear: () => void;
   t: TFunc;
 }) {
   const [ins, setIns] = useState(1);
@@ -1045,6 +1052,13 @@ function DocProps({
             <option value="burasage">{t('doc.kinsoku.hang')}</option>
           </select>
         </label>
+        {/* v0.14: ガイドライン — 本数の把握と一括削除の導線 */}
+        {guideCount > 0 && (
+          <div className="ins-row">
+            {tf(t, 'guide.count', guideCount)}{' '}
+            <button onClick={onGuidesClear}>{t('guide.clear')}</button>
+          </div>
+        )}
       </div>
       <StyleList
         styles={styles}

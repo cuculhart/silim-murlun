@@ -50,6 +50,7 @@ import {
   TEXT_KIND,
   TEXT_PAD_MM,
   type FontStyleDef,
+  type Guides,
   type ImageData,
   type StyleProps,
   type TextAreaData,
@@ -73,10 +74,15 @@ function pageObjects(model: PageModel, opacity = 1): WorldObject[] {
   }));
 }
 
-/** ページの辺・中心をドラッグ/リサイズのスナップ対象へ登録する */
-function syncSnapExtra(engine: Engine, model: PageModel): void {
-  const xs: number[] = [];
-  const ys: number[] = [];
+/** ページの辺・中心＋ガイドラインをドラッグ/リサイズの
+    スナップ対象へ登録する（v0.14: ガイド座標を併記） */
+function syncSnapExtra(
+  engine: Engine,
+  model: PageModel,
+  guides: Guides,
+): void {
+  const xs: number[] = [...guides.v];
+  const ys: number[] = [...guides.h];
   for (const r of pageRects(model.spec, model.pages)) {
     xs.push(r.x, r.x + r.w / 2, r.x + r.w);
     ys.push(r.y, r.y + r.h / 2, r.y + r.h);
@@ -191,6 +197,20 @@ export function App() {
   const [styles, setStyles] = useState<FontStyleDef[]>(() =>
     defaultStyles(t),
   );
+  // v0.14: ガイドライン — ルーラーから引き出す任意位置の基準線
+  // （world mm: v=x座標・h=y座標）。文書データとして書庫・
+  // Undo・下書きへ載り、スナップ対象にもなる
+  const [guides, setGuides] = useState<Guides>({ v: [], h: [] });
+  // ガイドの引き出し/移動ドラッグ中のセッション
+  const [guideDrag, setGuideDrag] = useState<{
+    axis: 'v' | 'h';
+    pos: number;
+    from: 'ruler' | 'line';
+    idx: number;
+    /** 線ドラッグ時の掴み位置オフセット（world mm）—
+        クリックだけで位置がずれないよう、掴んだ点と線の差を保持 */
+    grab: number;
+  } | null>(null);
   type Snap = {
     objects: WorldObject[];
     chains: Chain[];
@@ -201,6 +221,7 @@ export function App() {
     docFont: string;
     kinsoku?: KinsokuMode;
     styles: FontStyleDef[];
+    guides: Guides;
   };
   const histRef = useRef<{ past: Snap[]; future: Snap[]; last: number }>({
     past: [],
@@ -231,6 +252,10 @@ export function App() {
   linkModeRef.current = linkMode;
   const placingRef = useRef(placing);
   placingRef.current = placing;
+  const guidesRef = useRef(guides);
+  guidesRef.current = guides;
+  const guideDragRef = useRef(guideDrag);
+  guideDragRef.current = guideDrag;
   // v0.11: 禁則設定は計測器の閉包へ — 変更時に作り直し（doc 単位）
   const measurer = useMemo(
     () => createCanvasMeasurer(kinsoku),
@@ -261,7 +286,7 @@ export function App() {
       ...engine.doc,
       objects: pageObjects(model),
     });
-    syncSnapExtra(engine, model);
+    syncSnapExtra(engine, model, guidesRef.current);
     focusPage(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine]);
@@ -349,6 +374,7 @@ export function App() {
         setFindOpen(false);
         setShapeTool(null);
         setShapeDrag(null);
+        setGuideDrag(null);
         if (engine.mode === 'shape') engine.cancelShapeDraw();
         if (placingRef.current) {
           setPlacing(null);
@@ -451,7 +477,7 @@ export function App() {
       ...engine.doc,
       objects: [...pageObjects(next, pageOpacity / 100), ...content],
     });
-    syncSnapExtra(engine, next);
+    syncSnapExtra(engine, next, guidesRef.current);
   };
   const setSize = (size: PaperSize) =>
     commitPages(setPaper(model, { ...model.spec, size }));
@@ -491,6 +517,7 @@ export function App() {
     docFont,
     kinsoku,
     styles,
+    guides,
   });
   const applySnap = (s: Snap) => {
     applyingRef.current = true;
@@ -502,7 +529,7 @@ export function App() {
         ...s.objects,
       ],
     });
-    syncSnapExtra(engine, s.model);
+    syncSnapExtra(engine, s.model, s.guides);
     setChains(s.chains);
     setFooter(s.footer);
     setDocTitle(s.title);
@@ -510,6 +537,7 @@ export function App() {
     setDocFont(s.docFont);
     setKinsoku(s.kinsoku);
     setStyles(s.styles);
+    setGuides(s.guides);
     snapRef.current = s;
     applyingRef.current = false;
   };
@@ -549,7 +577,13 @@ export function App() {
     }
     snapRef.current = makeSnap();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engine.doc.objects, chains, model, footer, docTitle, pageOpacity, docFont, kinsoku, styles]);
+  }, [engine.doc.objects, chains, model, footer, docTitle, pageOpacity, docFont, kinsoku, styles, guides]);
+
+  // v0.14: ガイド変更 → スナップ対象へ反映（追加・移動・削除）
+  useEffect(() => {
+    syncSnapExtra(engine, model, guides);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guides]);
 
   // 未保存変更があるときの離脱警告
   useEffect(() => {
@@ -584,6 +618,7 @@ export function App() {
           docFont: DEFAULT_TEXT_DATA.fontFamily,
           kinsoku: 'oidashi',
           styles: defaultStyles(t),
+          guides: { v: [] as number[], h: [] as number[] },
         };
         const cur = {
           model: r.model,
@@ -596,6 +631,7 @@ export function App() {
           // フィールド欠落の旧下書きは既定と等価扱い（誤復元しない）
           kinsoku: r.kinsoku ?? 'oidashi',
           styles: r.styles ?? defaultStyles(t),
+          guides: r.guides ?? { v: [] as number[], h: [] as number[] },
         };
         if (JSON.stringify(blank) === JSON.stringify(cur)) return;
         applyArchive(r);
@@ -629,6 +665,7 @@ export function App() {
           docFont,
           kinsoku,
           styles,
+          guides,
         });
         const fp = docFp(createdAtRef.current, docTitle);
         void saveDraft(u8, fp).then((at) => {
@@ -641,7 +678,7 @@ export function App() {
     }, 1500);
     return () => window.clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engine.doc.objects, chains, model, footer, docTitle, pageOpacity, docFont, kinsoku, styles]);
+  }, [engine.doc.objects, chains, model, footer, docTitle, pageOpacity, docFont, kinsoku, styles, guides]);
 
   // F24: Alt 押下でスナップ（グリッド＋オブジェクト吸着）を一時解除
   useEffect(() => {
@@ -697,6 +734,7 @@ export function App() {
     setDocFont(DEFAULT_TEXT_DATA.fontFamily);
     setKinsoku('oidashi');
     setStyles(defaultStyles(t));
+    setGuides({ v: [], h: [] });
     createdAtRef.current = new Date().toISOString();
     // v0.9: 文書が切り替わった時点で fp を更新 — 旧文書の
     // 下書きが残っていても次回起動で誤復元しない
@@ -718,6 +756,7 @@ export function App() {
       docFont,
       kinsoku,
       styles,
+      guides,
     });
     const a = document.createElement('a');
     const url = URL.createObjectURL(
@@ -771,6 +810,8 @@ export function App() {
     // v0.13: 書式 — 欠落の旧書庫は既定セットをシード（適用しない
     // 限り見た目に影響しない）
     setStyles(r.styles ?? defaultStyles(t));
+    // v0.14: ガイド — 欠落の旧書庫は空
+    setGuides(r.guides ?? { v: [], h: [] });
     createdAtRef.current = r.createdAt || new Date().toISOString();
     // v0.9: 下書き fingerprint を開いた文書へ更新（下書き復元
     // 経路でも同一 fp になるため二重書きは害なし）
@@ -1391,6 +1432,109 @@ export function App() {
     engine.panBy(0, 0); // viewport 反映のため emit を起こす
   };
   const goToPage = (i: number) => focusPage(i);
+
+  // ── v0.14: ガイドライン — ルーラー引き出しで生成、線ドラッグで
+  // 移動、ルーラー方向（アクティブページの上辺/左辺より外）への
+  // ドロップで削除。引き出し・移動中は grid.snap に従い格子丸め
+  // （Alt 押下は既存ロジックが snap を切るので生位置になる） ──
+  const guidePosAt = (
+    axis: 'v' | 'h',
+    cx: number,
+    cy: number,
+    grab = 0,
+  ) => {
+    const r = canvasRef.current!.getBoundingClientRect();
+    const w = engine.screenToWorld({ x: cx - r.left, y: cy - r.top });
+    const raw = (axis === 'v' ? w.x : w.y) - grab;
+    const g = engine.doc.grid;
+    return g.snap && g.size > 0 ? Math.round(raw / g.size) * g.size : raw;
+  };
+  const startGuideDrag = (
+    axis: 'v' | 'h',
+    e: React.PointerEvent,
+    from: 'ruler' | 'line',
+    idx = -1,
+  ) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const r = canvasRef.current!.getBoundingClientRect();
+    const w = engine.screenToWorld({
+      x: e.clientX - r.left,
+      y: e.clientY - r.top,
+    });
+    const grab =
+      from === 'line'
+        ? (axis === 'v' ? w.x : w.y) - guidesRef.current[axis][idx]
+        : 0;
+    setGuideDrag({
+      axis,
+      pos: guidePosAt(axis, e.clientX, e.clientY, grab),
+      from,
+      idx,
+      grab,
+    });
+  };
+  // ドラッグ中は window で追跡 — ルーラー帯の外・キャンバス外へ
+  // 出ても途切れない。up 位置がアクティブページのルーラー側辺を
+  // 越えていればキャンセル（引き出し）/削除（移動）
+  useEffect(() => {
+    if (!guideDrag) return;
+    const move = (e: PointerEvent) => {
+      setGuideDrag((d) =>
+        d
+          ? { ...d, pos: guidePosAt(d.axis, e.clientX, e.clientY, d.grab) }
+          : d,
+      );
+    };
+    const up = (e: PointerEvent) => {
+      const d = guideDragRef.current;
+      if (!d) return;
+      const r0 = canvasRef.current!.getBoundingClientRect();
+      const w = engine.screenToWorld({
+        x: e.clientX - r0.left,
+        y: e.clientY - r0.top,
+      });
+      const raw = (d.axis === 'v' ? w.x : w.y) - d.grab;
+      const orig =
+        d.from === 'line' ? guidesRef.current[d.axis][d.idx] : undefined;
+      // 無移動のクリックでは格子ずれ（Alt 配置）のガイドを吸着で
+      // 動かさない — 生位置が元と同じなら元の座標を維持する
+      const pos =
+        orig !== undefined && raw === orig
+          ? orig
+          : guidePosAt(d.axis, e.clientX, e.clientY, d.grab);
+      const p = pageRects(model.spec, model.pages)[curPage];
+      const o = p ? engine.worldToScreen({ x: p.x, y: p.y }) : null;
+      const cr = canvasRef.current!.getBoundingClientRect();
+      const off = o
+        ? d.axis === 'v'
+          ? e.clientX - cr.left < o.x
+          : e.clientY - cr.top < o.y
+        : false;
+      setGuides((g) => {
+        const arr = g[d.axis];
+        if (d.from === 'ruler') {
+          if (off) return g;
+          return { ...g, [d.axis]: [...arr, pos] };
+        }
+        if (off)
+          return { ...g, [d.axis]: arr.filter((_, i) => i !== d.idx) };
+        return {
+          ...g,
+          [d.axis]: arr.map((v, i) => (i === d.idx ? pos : v)),
+        };
+      });
+      setGuideDrag(null);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    return () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guideDrag != null]);
 
   // ── v0.10: 全文検索 — 全連鎖を indexOf で素朴に横断走査 ──
   const collectHits = (q: string) => {
@@ -2015,11 +2159,67 @@ export function App() {
               }}
             />
           )}
+          {/* v0.14: ガイドライン — 全キャンバスを貫く基準線。
+              オブジェクトではないため印刷へは出ない。
+              ドラッグ中の線はプレビューへ切替えて残像を消す */}
+          {guides.v.map((gx, i) =>
+            guideDrag?.from === 'line' &&
+            guideDrag.axis === 'v' &&
+            guideDrag.idx === i ? null : (
+              <div
+                key={`gv${i}`}
+                className="guide-v"
+                style={{
+                  left: engine.worldToScreen({ x: gx, y: 0 }).x - 3,
+                }}
+                onPointerDown={(e) => startGuideDrag('v', e, 'line', i)}
+                onClick={(e) => e.stopPropagation()}
+                onDoubleClick={(e) => e.stopPropagation()}
+              />
+            ),
+          )}
+          {guides.h.map((gy, i) =>
+            guideDrag?.from === 'line' &&
+            guideDrag.axis === 'h' &&
+            guideDrag.idx === i ? null : (
+              <div
+                key={`gh${i}`}
+                className="guide-h"
+                style={{
+                  top: engine.worldToScreen({ x: 0, y: gy }).y - 3,
+                }}
+                onPointerDown={(e) => startGuideDrag('h', e, 'line', i)}
+                onClick={(e) => e.stopPropagation()}
+                onDoubleClick={(e) => e.stopPropagation()}
+              />
+            ),
+          )}
+          {guideDrag && (
+            <div
+              className={`guide-drag ${guideDrag.axis}`}
+              style={
+                guideDrag.axis === 'v'
+                  ? {
+                      left: engine.worldToScreen({
+                        x: guideDrag.pos,
+                        y: 0,
+                      }).x,
+                    }
+                  : {
+                      top: engine.worldToScreen({
+                        x: 0,
+                        y: guideDrag.pos,
+                      }).y,
+                    }
+              }
+            />
+          )}
           {rulerOn && rects[curPage] && (
             <Rulers
               engine={engine}
               page={rects[curPage]}
               cursor={engine.cursorWorld}
+              onGuideStart={(axis, e) => startGuideDrag(axis, e, 'ruler')}
             />
           )}
           <PageNav
@@ -2264,6 +2464,8 @@ export function App() {
               addStyleDef(name, props),
             onStyleUpdate: updateStyleDef,
             onStyleDelete: deleteStyleDef,
+            guideCount: guides.v.length + guides.h.length,
+            onGuidesClear: () => setGuides({ v: [], h: [] }),
           }}
           t={t}
         />

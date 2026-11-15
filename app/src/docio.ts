@@ -6,7 +6,12 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import type { WorldObject } from '@kimetron/core';
 import type { Chain, KinsokuMode, PageModel } from 'inimbal';
-import { IMG_KIND, type FontStyleDef, type ImageData } from './types';
+import {
+  IMG_KIND,
+  type FontStyleDef,
+  type Guides,
+  type ImageData,
+} from './types';
 
 export const ARCHIVE_FORMAT = 'silim-murlun/1';
 export const ARCHIVE_EXT = '.chsmf';
@@ -27,6 +32,8 @@ interface ArchiveDoc {
   kinsoku?: KinsokuMode;
   /** v0.13: 書式（スタイル）一覧 — 欠落 = 既定セットをシード */
   styles?: FontStyleDef[];
+  /** v0.14: ガイドライン（world mm）— 欠落 = ガイドなし */
+  guides?: Guides;
 }
 
 const EXT_OF_MIME: Record<string, string> = {
@@ -73,6 +80,7 @@ export function packArchive(input: {
   docFont?: string;
   kinsoku?: KinsokuMode;
   styles?: FontStyleDef[];
+  guides?: Guides;
 }): Uint8Array {
   const files: Record<string, Uint8Array> = {};
   let imgN = 0;
@@ -99,6 +107,7 @@ export function packArchive(input: {
     docFont: input.docFont,
     kinsoku: input.kinsoku,
     styles: input.styles,
+    guides: input.guides,
   };
   files['doc.json'] = strToU8(JSON.stringify(doc));
   return zipSync(files);
@@ -116,6 +125,7 @@ export function unpackArchive(bytes: Uint8Array): {
   docFont?: string;
   kinsoku?: KinsokuMode;
   styles?: FontStyleDef[];
+  guides?: Guides;
 } {
   const files = unzipSync(bytes);
   const raw = files['doc.json'];
@@ -163,5 +173,16 @@ export function unpackArchive(bytes: Uint8Array): {
             typeof s.props === 'object',
         )
       : undefined,
+    // v0.14: ガイドライン — 欠落 = なし。数値のみ受容
+    // （外部生成書庫の不正値を捨てる）
+    guides: (() => {
+      const g = doc.guides;
+      if (!g || typeof g !== 'object') return undefined;
+      const nums = (a: unknown): number[] =>
+        Array.isArray(a)
+          ? a.filter((n) => typeof n === 'number' && Number.isFinite(n))
+          : [];
+      return { v: nums(g.v), h: nums(g.h) };
+    })(),
   };
 }

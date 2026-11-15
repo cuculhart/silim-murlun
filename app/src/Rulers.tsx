@@ -10,12 +10,16 @@ export function Rulers({
   engine,
   page,
   cursor,
+  onGuideStart,
 }: {
   engine: Engine;
   /** アクティブページ枠（world mm） */
   page: { x: number; y: number; w: number; h: number };
   /** カーソル位置（world mm） */
   cursor: { x: number; y: number };
+  /** v0.14: 帯の mousedown → ガイドライン引き出し開始
+      （縦ルーラー → 縦ガイド 'v' / 横ルーラー → 横ガイド 'h'） */
+  onGuideStart?: (axis: 'v' | 'h', e: React.PointerEvent) => void;
 }) {
   const u =
     engine.worldToScreen({ x: 1, y: 0 }).x -
@@ -43,6 +47,7 @@ export function Rulers({
       <div
         className="ruler ruler-h"
         style={{ left: o.x, top: o.y - H - 1, width: page.w * u }}
+        onPointerDown={(e) => onGuideStart?.('h', e)}
       >
         {ticks(page.w).map((t) => (
           <div
@@ -58,6 +63,7 @@ export function Rulers({
       <div
         className="ruler ruler-v"
         style={{ left: o.x - H - 1, top: o.y, height: page.h * u }}
+        onPointerDown={(e) => onGuideStart?.('v', e)}
       >
         {ticks(page.h).map((t) => (
           <div
