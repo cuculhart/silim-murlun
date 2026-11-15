@@ -2,6 +2,66 @@
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-15
+
+### English
+
+Hanging-punctuation kinsoku — line-ending punctuation may
+overhang the line edge by one character for even line ends.
+
+- Hanging kinsoku (N-34): the "Line-break rules" document
+  setting gains a third choice — Off / Push-out / Hanging
+  (`kinsoku: 'burasage'`). When the char that would start the
+  next line is a hangable punctuation (`。、．，｡､`), `fit()`
+  lets it overhang the line edge by up to one char instead of
+  pushing it out — the same rule as Kusuma Plava's vertical
+  typesetting. Punctuation classes only: closing brackets, small
+  kana, and other head-forbidden chars still push out, and the
+  pull-back still applies (a second consecutive punctuation is
+  carried to the next line). Archives without `kinsoku` still
+  mean "off"; new documents still default to push-out — hanging
+  is opt-in. Saved in archives, undo snapshots, and drafts.
+- Measured line breaks now drive rendering: `fitLines` returns
+  the break positions, `layoutChain` stores them on each
+  `Slice.lines`, and `.ta-slice` plus the print path render one
+  block per measured line (`white-space: pre`, runs re-sliced
+  per line via `sliceRuns`) instead of letting the browser
+  re-wrap with `pre-wrap`. This makes measurement and display
+  agree by construction — and it is what makes the overhanging
+  punctuation visible at all, since the DOM's own line breaking
+  could never hang it. Clipping opens ~1.2em on the right edge
+  (edit view `.ta-slice` + `.ki-obj`, print `.parea`) so the
+  hang shows past the area edge; top/bottom/left stay clipped.
+  Older measurers without `fitLines` still render via the
+  free-wrap path.
+
+### 日本語
+
+ぶら下げ禁則 — 行末の句読点を行の規定幅へ1字はみ出して
+行末を揃える。
+
+- ぶら下げ禁則（N-34）: 文書設定「禁則処理」を3択化
+  （なし / 追い出し / ぶら下げ — `kinsoku: 'burasage'`）。
+  次行頭になる字がぶら下げ対象（`。、．，｡､` の句読点類）
+  のとき、`fit()` は次行へ送る代わりに行の規定幅へ最大1字
+  はみ出して配置する — kusuma-plava 縦組と同じルール。
+  対象は句読点のみ — 閉じ括弧・小さい仮名等の行頭禁則字は
+  従来どおり次行へ送られ、前倒しも併用される（連続句読点の
+  2字目以降は次行へ連れて行く）。書庫の `kinsoku` 欠落 =
+  なしの互換は不変。新規文書の既定は追い出しのまま —
+  ぶら下げは opt-in。書庫・Undo・下書きで保持される
+- 計測した行区切りが描画を駆動: `fitLines` が行区切り位置を
+  返し、`layoutChain` が `Slice.lines` へ格納。`.ta-slice`
+  と印刷経路は計測どおりの行単位ブロックで描画
+  （`white-space: pre`＋ランを行ごとに `sliceRuns` 再分割）
+  — ブラウザの `pre-wrap` 自由折返しは使わない。これで
+  計測=描画が構造的に一致し、はみ出した句読点も実際に
+  表示される（DOM の自行分割では表現できないため）。右方向の
+  クリップを約1.2em 開放（編集画面 `.ta-slice`＋`.ki-obj`、
+  印刷 `.parea`）してはみ出しを枠外まで見せる —
+  上下・左は従来どおり刈る。`fitLines` を持たない旧計測は
+  従来の自由折返し描画へフォールバック
+
 ## [0.11.0] - 2026-11-15
 
 ### English

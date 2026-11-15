@@ -142,6 +142,9 @@ export function unpackArchive(bytes: Uint8Array): {
     docFont: doc.docFont,
     // 未知値は捨てて「なし」扱い — 将来モードが増えた
     // バージョンの書庫を開いても旧レイアウトへ落ちる
-    kinsoku: doc.kinsoku === 'oidashi' ? 'oidashi' : undefined,
+    kinsoku:
+      doc.kinsoku === 'oidashi' || doc.kinsoku === 'burasage'
+        ? doc.kinsoku
+        : undefined,
   };
 }

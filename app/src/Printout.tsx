@@ -31,6 +31,7 @@ export function Printout({
   objects,
   sliceRuns,
   areaAlone,
+  hang,
   onPrint,
   onClose,
   t,
@@ -38,10 +39,13 @@ export function Printout({
   model: PageModel;
   footer: boolean;
   objects: WorldObject[];
-  /** テキストエリア → 表示中スライスのラン列（連鎖レイアウト＋装飾解決済み） */
-  sliceRuns: (o: WorldObject) => TextRun[];
+  /** テキストエリア → 表示中スライスの行×ラン列（連鎖レイアウト＋
+      装飾解決済み。行区切りが無い旧経路は1行に全ランを入れて返す） */
+  sliceRuns: (o: WorldObject) => TextRun[][];
   /** 単独（非連鎖）テキストエリアか — 揃えは単独のみ有効 */
   areaAlone: (o: WorldObject) => boolean;
+  /** ぶら下げ禁則 — 句読点をエリア枠の外へはみ出して描画する */
+  hang?: boolean;
   onPrint: () => void;
   onClose: () => void;
   t: (key: string) => string;
@@ -198,7 +202,7 @@ export function Printout({
                 return (
                   <div
                     key={o.id}
-                    className="parea"
+                    className={`parea${hang ? ' hang' : ''}`}
                     style={{
                       left: `${left}mm`,
                       top: `${top}mm`,
@@ -223,40 +227,52 @@ export function Printout({
                         : {}),
                     }}
                   >
-                    {sliceRuns(o).map((r, i) => {
-                      const span = (
-                        <span
-                          style={{
-                            fontSize: `${r.attrs.fontSize ?? d.fontSize}mm`,
-                            fontFamily: r.attrs.fontFamily,
-                            color: r.attrs.link
-                              ? '#1a56c4'
-                              : (r.attrs.color ?? d.color),
-                            fontWeight: r.attrs.bold ? 'bold' : undefined,
-                            fontStyle: r.attrs.italic ? 'italic' : undefined,
-                            textDecoration:
-                              r.attrs.underline || r.attrs.link
-                                ? 'underline'
-                                : undefined,
-                          }}
-                        >
-                          {r.text}
-                        </span>
-                      );
-                      // 印刷は <a> で出す → PDF 書き出しでリンクが生きる
-                      return r.attrs.link ? (
-                        <a
-                          key={i}
-                          href={r.attrs.link}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          {span}
-                        </a>
-                      ) : (
-                        <span key={i}>{span}</span>
-                      );
-                    })}
+                    {sliceRuns(o).map((lruns, li) => (
+                      // v0.12: 行単位 — 計測の区切り位置で固定し、
+                      // ブラウザの自由折返しには委ねない
+                      <div key={li} className="pline">
+                        {lruns.length === 0
+                          ? '\u00a0'
+                          : lruns.map((r, i) => {
+                              const span = (
+                                <span
+                                  style={{
+                                    fontSize: `${r.attrs.fontSize ?? d.fontSize}mm`,
+                                    fontFamily: r.attrs.fontFamily,
+                                    color: r.attrs.link
+                                      ? '#1a56c4'
+                                      : (r.attrs.color ?? d.color),
+                                    fontWeight: r.attrs.bold
+                                      ? 'bold'
+                                      : undefined,
+                                    fontStyle: r.attrs.italic
+                                      ? 'italic'
+                                      : undefined,
+                                    textDecoration:
+                                      r.attrs.underline || r.attrs.link
+                                        ? 'underline'
+                                        : undefined,
+                                  }}
+                                >
+                                  {r.text}
+                                </span>
+                              );
+                              // 印刷は <a> で出す → PDF 書き出しでリンクが生きる
+                              return r.attrs.link ? (
+                                <a
+                                  key={i}
+                                  href={r.attrs.link}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  {span}
+                                </a>
+                              ) : (
+                                <span key={i}>{span}</span>
+                              );
+                            })}
+                      </div>
+                    ))}
                   </div>
                 );
               }

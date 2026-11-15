@@ -104,8 +104,9 @@ const ja = {
   'doc.kinsoku': '禁則処理',
   'doc.kinsoku.off': 'なし',
   'doc.kinsoku.oi': '追い出し',
+  'doc.kinsoku.hang': 'ぶら下げ',
   'doc.kinsokuTip':
-    '行頭の、。や行末の「を避けて折り返します（書庫に保存）',
+    '行末の禁則処理の選び方 — 追い出し: 、。などを次の行頭へ送る / ぶら下げ: 句読点を行の規定幅へ1字はみ出して行末を揃える（書庫に保存）',
   'doc.hint': '未選択 / 複数選択 — オブジェクトを選ぶとプロパティが出ます',
   'img.title': '画像',
   'img.lock': 'アスペクト比をロック',
@@ -282,8 +283,9 @@ const en: Record<keyof typeof ja, string> = {
   'doc.kinsoku': 'Line-break rules',
   'doc.kinsoku.off': 'Off',
   'doc.kinsoku.oi': 'Push-out',
+  'doc.kinsoku.hang': 'Hanging',
   'doc.kinsokuTip':
-    'Wraps lines so ，。 never start a line and open brackets never end one (saved in the archive)',
+    'Line-end rules — Push-out sends punctuation to the next line to keep it inside the line edge; Hanging lets punctuation overhang the line edge by one char for even line ends (saved in the archive)',
   'doc.hint': 'Nothing / multiple selected — select an object for properties',
   'img.title': 'Image',
   'img.lock': 'Lock aspect ratio',

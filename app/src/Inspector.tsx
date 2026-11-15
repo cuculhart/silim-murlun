@@ -769,6 +769,7 @@ function DocProps({
           >
             <option value="">{t('doc.kinsoku.off')}</option>
             <option value="oidashi">{t('doc.kinsoku.oi')}</option>
+            <option value="burasage">{t('doc.kinsoku.hang')}</option>
           </select>
         </label>
       </div>

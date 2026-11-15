@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  fitLines,
   fitText,
   isEndKinsoku,
+  isHangKinsoku,
   isHeadKinsoku,
   kinsokuBreak,
+  lineRanges,
   type KinsokuMode,
 } from '../src/kinsoku';
 
@@ -91,5 +94,63 @@ describe('fitText + 禁則（追い出し）', () => {
     expect(fit1('あいうえお', 2)).toBe(2);
     // \n 行送り×2 → 2行目の \n で高さ超過となりその行頭で打ち切り
     expect(fit1('あ\nい\nう', 9)).toBe(2);
+  });
+});
+
+describe('ぶら下げ（burasage）', () => {
+  it('ぶら下げ対象は句読点類のみ', () => {
+    for (const ch of '。、．，｡､') expect(isHangKinsoku(ch)).toBe(true);
+    expect(isHangKinsoku('」')).toBe(false);
+    expect(isHangKinsoku('っ')).toBe(false);
+    expect(isHangKinsoku('あ')).toBe(false);
+  });
+
+  it('、が行の規定幅へ1字はみ出す', () => {
+    // 幅3字 — 、をはみ出して「あいう、」が1行目。高さ1行なので
+    // 2行目「えおか」の次の折返しで打ち切り → 接頭辞は4字ぶん
+    expect(fit1('あいう、えおかき', 3, 'burasage')).toBe(4);
+  });
+
+  it('はみ出しは原則1字 — 連続句読点は前倒しでまとめて次行へ', () => {
+    // 、をはみ出しても直後の。が来る → 追い出し側の前倒しで
+    // 「う、。」が次行へ送られる（接頭辞は「あい」の2字）
+    expect(fit1('あいう、。えお', 3, 'burasage')).toBe(2);
+  });
+
+  it('対象外の行頭禁則字は追い出しと同じく次行へ送る', () => {
+    // 」・っ はぶら下げ対象外 → oidashi と同じ前倒し
+    expect(fit1('あいう」えお', 3, 'burasage')).toBe(2);
+    expect(fit1('あいうっえお', 3, 'burasage')).toBe(2);
+  });
+
+  it('oidashi ははみ出さない（回帰確認）', () => {
+    expect(fit1('あいう、えお', 3, 'oidashi')).toBe(2);
+  });
+});
+
+describe('fitLines — 行の区切り位置', () => {
+  it('折返し位置を breaks として返す', () => {
+    // 幅3字・高さ2行 — burasage で「あいう、」「えお」の2行
+    const r = fitLines('あいう、えお', 3, 2.8, MET, {
+      lineHeight: 1.4,
+      kinsoku: 'burasage',
+    });
+    expect(r).toEqual({ n: 6, breaks: [4] });
+  });
+
+  it('改行も区切りとして返す', () => {
+    const r = fitLines('あ\nい', 9, 9, MET, { lineHeight: 1.4 });
+    expect(r).toEqual({ n: 3, breaks: [2] });
+  });
+
+  it('lineRanges が行区間を返す（描画の行分割と同じ座標系）', () => {
+    const text = 'あいう、えお';
+    const ranges = lineRanges(text, [4]);
+    expect(ranges.map(([s, e]) => text.slice(s, e))).toEqual([
+      'あいう、',
+      'えお',
+    ]);
+    // breaks なし = 全体が1区間（自由折返しフォールバック）
+    expect(lineRanges(text, undefined)).toEqual([[0, text.length]]);
   });
 });

@@ -14,6 +14,7 @@ import {
   deletePage,
   insertPage,
   layoutChain,
+  lineRanges,
   linkChains,
   pageRects,
   pruneChains,
@@ -1449,7 +1450,7 @@ export function App() {
       const c = chainOf(chains, o.id);
       const lr = c ? layouts.get(c.id) : undefined;
       const sl = lr?.slices.find((s) => s.areaId === o.id);
-      const runs = sliceRuns(sl?.text ?? '', c?.marks, sl?.offset ?? 0, {
+      const baseAttrs = {
         fontSize: d.fontSize,
         fontFamily: d.fontFamily,
         color: d.color,
@@ -1457,11 +1458,43 @@ export function App() {
         italic: d.italic,
         underline: d.underline,
         link: d.link,
-      });
+      };
+      const runs = sliceRuns(
+        sl?.text ?? '',
+        c?.marks,
+        sl?.offset ?? 0,
+        baseAttrs,
+      );
+      // v0.12: fitLines が行区切りを返すスライスは行単位で描画 —
+      // 計測と描画の行分割を一致させ、ぶら下げのはみ出しを再現する
+      const lineRunsList = sl?.lines
+        ? lineRanges(sl.text, sl.lines).map(([s, e]) => {
+            const lt = sl.text.slice(s, e).replace(/\n$/, '');
+            return sliceRuns(lt, c?.marks, sl.offset + s, baseAttrs);
+          })
+        : null;
       const isLast = c ? c.areas[c.areas.length - 1] === o.id : false;
       const overflow = isLast ? (lr?.overflow ?? '') : '';
       // リンク連鎖（複数エリア）は左上起点固定。単独エリアのみ揃え可
       const alone = !c || c.areas.length === 1;
+      const runSpan = (r: (typeof runs)[number], i: number) => (
+        <span
+          key={i}
+          title={r.attrs.link}
+          style={{
+            fontSize: r.attrs.fontSize! * MM_PX * z,
+            fontFamily: r.attrs.fontFamily,
+            // リンクは編集画面では遷移させず色+下線で表現
+            color: r.attrs.link ? '#1a56c4' : r.attrs.color,
+            fontWeight: r.attrs.bold ? 'bold' : undefined,
+            fontStyle: r.attrs.italic ? 'italic' : undefined,
+            textDecoration:
+              r.attrs.underline || r.attrs.link ? 'underline' : undefined,
+          }}
+        >
+          {r.text}
+        </span>
+      );
       return (
         <div
           className={`ta${linkFrom === o.id ? ' link-from' : ''}`}
@@ -1477,7 +1510,7 @@ export function App() {
           }}
         >
           <div
-            className="ta-slice"
+            className={`ta-slice${kinsoku === 'burasage' ? ' hang' : ''}`}
             style={
               alone
                 ? {
@@ -1494,26 +1527,13 @@ export function App() {
                 : undefined
             }
           >
-            {runs.map((r, i) => (
-              <span
-                key={i}
-                title={r.attrs.link}
-                style={{
-                  fontSize: r.attrs.fontSize! * MM_PX * z,
-                  fontFamily: r.attrs.fontFamily,
-                  // リンクは編集画面では遷移させず色+下線で表現
-                  color: r.attrs.link ? '#1a56c4' : r.attrs.color,
-                  fontWeight: r.attrs.bold ? 'bold' : undefined,
-                  fontStyle: r.attrs.italic ? 'italic' : undefined,
-                  textDecoration:
-                    r.attrs.underline || r.attrs.link
-                      ? 'underline'
-                      : undefined,
-                }}
-              >
-                {r.text}
-              </span>
-            ))}
+            {lineRunsList
+              ? lineRunsList.map((lruns, li) => (
+                  <div key={li} className="ta-line">
+                    {lruns.length === 0 ? '\u00a0' : lruns.map(runSpan)}
+                  </div>
+                ))
+              : runs.map(runSpan)}
           </div>
           {overflow.length > 0 && (
             <div
@@ -2154,7 +2174,7 @@ export function App() {
             const sl = lr?.slices.find((s) => s.areaId === o.id);
             if (!sl) return [];
             const d = { ...DEFAULT_TEXT_DATA, ...(o.data as TextAreaData) };
-            return sliceRuns(sl.text, c.marks, sl.offset, {
+            const base = {
               fontSize: d.fontSize,
               fontFamily: d.fontFamily,
               color: d.color,
@@ -2162,12 +2182,25 @@ export function App() {
               italic: d.italic,
               underline: d.underline,
               link: d.link,
-            });
+            };
+            // v0.12: 行単位 — 計測の区切り位置でランを行ごとに分ける
+            if (sl.lines) {
+              return lineRanges(sl.text, sl.lines).map(([s, e]) =>
+                sliceRuns(
+                  sl.text.slice(s, e).replace(/\n$/, ''),
+                  c.marks,
+                  sl.offset + s,
+                  base,
+                ),
+              );
+            }
+            return [sliceRuns(sl.text, c.marks, sl.offset, base)];
           }}
           areaAlone={(o) => {
             const c = chainOf(chains, o.id);
             return !c || c.areas.length === 1;
           }}
+          hang={kinsoku === 'burasage'}
           onPrint={() => window.print()}
           onClose={() => setPrinting(false)}
           t={t}

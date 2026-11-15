@@ -330,6 +330,26 @@ body,
   overflow-wrap: break-word;
 }
 
+/* v0.12: 行単位描画 — 各行は計測どおりの区切りで折返し禁止。
+   空行は nbsp で高さを確保する */
+.ta-line {
+  white-space: pre;
+}
+
+/* v0.12: ぶら下げ — 行規定幅へはみ出した句読点が刈られないよう、
+   右方向のクリップのみ1.2emぶん開放（上下左は従来どおり刈る） */
+.ta-slice.hang {
+  overflow: visible;
+  clip-path: inset(0 -1.2em 0 0);
+}
+
+/* v0.12: ぶら下げ — 句読点をオブジェクト枠の外へ出すため、
+   hang スライスを持つテキストエリアは枠クリップを解除。
+   上下は .ta-slice の clip-path が引き続き刈る */
+.ki-obj:has(.ta-slice.hang) {
+  overflow: visible;
+}
+
 .oflabel {
   position: absolute;
   right: 2px;
@@ -1096,6 +1116,18 @@ body,
   white-space: pre-wrap;
   overflow-wrap: break-word;
   box-sizing: border-box;
+}
+
+/* v0.12: 行単位描画（印刷）— 計測どおりの区切りで折返し禁止 */
+.pline {
+  white-space: pre;
+}
+
+/* v0.12: ぶら下げ — 印刷では句読点をエリア枠の外へ出すため
+   右方向のクリップを1.2emぶん開放する */
+.parea.hang {
+  overflow: visible;
+  clip-path: inset(0 -1.2em 0 0);
 }
 
 .pfoot {

@@ -25,8 +25,17 @@ export const isHeadKinsoku = (ch: string) => HEAD_KINSOKU.has(ch);
 /** 行末に来られない字か（行末禁則） */
 export const isEndKinsoku = (ch: string) => END_KINSOKU.has(ch);
 
-/** 禁則モード — 現状は追い出しのみ。欠落（undefined）= なし */
-export type KinsokuMode = 'oidashi';
+// v0.12: ぶら下げ対象（kinsoku='burasage'）— 行の規定幅へ1字はみ出して
+// 置ける行頭禁則字を句読点類に限定する（閉じ括弧等は対象外 — 追い出し側
+// の前倒しで処理する。原則1字まで。kusuma tategaki.ts と同じ字種）
+const HANG_KINSOKU = new Set([...'。、．，｡､']);
+
+/** 行の規定幅へはみ出して置ける字か（ぶら下げ対象） */
+export const isHangKinsoku = (ch: string) => HANG_KINSOKU.has(ch);
+
+/** 禁則モード — 'oidashi'=追い出し / 'burasage'=ぶら下げ。
+    欠落（undefined）= なし */
+export type KinsokuMode = 'oidashi' | 'burasage';
 
 /** 追い出しの最大前倒し字数（kusuma と同じ実務ルール） */
 const MAX_PULL = 2;
@@ -68,25 +77,31 @@ export interface LineMetrics {
 
 /**
  * 横組み fit() の行分割コア — text を幅 maxW・高さ maxH の箱へ
- * 流し込み、収まる接頭辞の文字数を返す。
+ * 流し込み、収まる接頭辞と行の区切り位置を返す。
  * 幅超過 → 直前の空白で切る（空白は前行末へ残す）or 文字単位で
  * 強制切断（和文）。\n は行送り。2行目以降が高さに入らないなら
  * その行頭で打ち切る（1行目は必ず計上）。
- * opts.kinsoku='oidashi' で禁則の分割点前倒しが有効になる。
+ * opts.kinsoku='oidashi' で禁則の分割点前倒し、'burasage' で
+ * 句読点類の1字はみ出し（前倒しも併用）が有効になる。
+ * breaks は「次行の先頭位置」の列 — 収まった接頭辞内に限る。
  */
-export function fitText(
+export function fitLines(
   text: string,
   maxW: number,
   maxH: number,
   m: LineMetrics,
   opts?: { lineHeight?: number; kinsoku?: KinsokuMode },
-): number {
+): { n: number; breaks: number[] } {
   const lh0 = opts?.lineHeight ?? 1.4;
-  const oidashi = opts?.kinsoku === 'oidashi';
+  const kinsoku = opts?.kinsoku;
+  const oidashi = kinsoku === 'oidashi' || kinsoku === 'burasage';
+  const burasage = kinsoku === 'burasage';
   let pos = 0;
   let lineStart = 0;
   let usedH = 0;
   let lineMaxPx = 0;
+  let hang = false; // 現行ですでに句読点をはみ出したか（1字まで）
+  const breaks: number[] = [];
   while (pos < text.length) {
     const ch = text[pos];
     const rpx = m.sizeAt(pos);
@@ -99,8 +114,10 @@ export function fitText(
       }
       usedH += lh;
       lineMaxPx = 0;
+      hang = false;
       pos++;
       lineStart = pos;
+      breaks.push(pos);
       continue;
     }
     if (m.widthOf(lineStart, pos + 1) <= maxW) {
@@ -111,6 +128,15 @@ export function fitText(
     if (pos === lineStart) {
       lineMaxPx = Math.max(lineMaxPx, rpx);
       pos++; // 1字でも幅超過 → 強制進行
+      continue;
+    }
+    // ぶら下げ — 次行頭になる句読点類は1字だけ現行へはみ出す。
+    // 連続句読点（、。等）は2字目以降が通常の境界調整へ落ち、
+    // 前倒しが起きればはみ出した句読点ごと次行へ送られる
+    if (burasage && !hang && isHangKinsoku(ch)) {
+      hang = true;
+      lineMaxPx = Math.max(lineMaxPx, rpx);
+      pos++;
       continue;
     }
     // 直前の空白で切る（空白は前行末へ残す）
@@ -128,6 +154,36 @@ export function fitText(
     pos = breakPos;
     lineStart = pos;
     lineMaxPx = 0;
+    hang = false;
+    breaks.push(pos);
   }
-  return pos;
+  return { n: pos, breaks: breaks.filter((b) => b < pos) };
+}
+
+/**
+ * 収まる接頭辞の文字数だけが欲しい場合の薄いラッパ。
+ */
+export function fitText(
+  text: string,
+  maxW: number,
+  maxH: number,
+  m: LineMetrics,
+  opts?: { lineHeight?: number; kinsoku?: KinsokuMode },
+): number {
+  return fitLines(text, maxW, maxH, m, opts).n;
+}
+
+/**
+ * スライステキストを行区切りで分けた [s,e) 区間列を返す。
+ * breaks は fitLines が返す行頭位置（slice text 先頭基準）。
+ */
+export function lineRanges(
+  text: string,
+  breaks: number[] | undefined,
+): [number, number][] {
+  const starts = [0, ...(breaks ?? [])];
+  return starts.map((s, i) => [
+    s,
+    i + 1 < starts.length ? starts[i + 1] : text.length,
+  ]);
 }

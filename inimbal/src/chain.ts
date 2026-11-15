@@ -29,6 +29,9 @@ export interface AreaBox {
 export interface TextMeasurer {
   /** text を box の内寸へ流し込み、収まった接頭辞の文字数を返す */
   fit(text: string, box: AreaBox): number;
+  /** v0.12: 行の区切り位置（接頭辞内の次行先頭 index 列）も返せる
+      場合 — 行単位描画に使う。未提供なら自由折返し描画へ落ちる */
+  fitLines?(text: string, box: AreaBox): { n: number; breaks: number[] };
 }
 
 export interface Slice {
@@ -36,6 +39,8 @@ export interface Slice {
   text: string;
   /** chain.text 内での開始位置（部分装飾マークの交差計算用） */
   offset: number;
+  /** スライス内の行頭位置（text 先頭基準）— fitLines 提供時のみ */
+  lines?: number[];
 }
 
 export interface LayoutResult {
@@ -59,12 +64,15 @@ export function layoutChain(
   let rest = text;
   let consumed = 0;
   for (const b of boxes) {
-    const n = measure.fit(rest, {
-      ...b,
-      marks,
-      textOffset: consumed,
+    const box = { ...b, marks, textOffset: consumed };
+    const fl = measure.fitLines?.(rest, box);
+    const n = fl?.n ?? measure.fit(rest, box);
+    slices.push({
+      areaId: b.id,
+      text: rest.slice(0, n),
+      offset: consumed,
+      ...(fl ? { lines: fl.breaks } : {}),
     });
-    slices.push({ areaId: b.id, text: rest.slice(0, n), offset: consumed });
     consumed += n;
     rest = rest.slice(n);
   }
