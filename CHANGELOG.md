@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-15
+
+### English
+
+### Fixed
+
+- The side-menu "Save as" button now actually opens the save
+  dialog — on desktop it had been wired to overwrite-save
+- Ctrl+Shift+S now works as Save As on the canvas too
+- The side-menu save tooltip no longer shows a shortcut
+  (Ctrl+S overwrite-saves on desktop, so the old "Ctrl+S"
+  hint was wrong there)
+
+### 日本語
+
+- 修正: 左メニューの「存（名前を付けて保存）」が上書き保存に
+  なっていたのを、保存ダイアログを開く動作へ修正
+- 修正: Ctrl+Shift+S がキャンバス上でも「名前を付けて保存」
+  として効くようにした
+- 修正: 「存」ボタンのツールチップからショートカット表記を
+  削除（デスクトップでは Ctrl+S が上書き保存のため、
+  旧表記は誤りだった）
+
 ## [1.0.0] - 2026-11-15
 
 ### English

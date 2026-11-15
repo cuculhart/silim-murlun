@@ -342,7 +342,8 @@ export function App() {
       if (t && ['TEXTAREA', 'INPUT', 'SELECT'].includes(t.tagName)) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         e.preventDefault();
-        setSaveDlg(docTitle || 'document');
+        if (isDesktop) void desktopActions.current.saveDesktop(e.shiftKey);
+        else setSaveDlg(docTitle || 'document');
         return;
       }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
@@ -2027,7 +2028,7 @@ export function App() {
             else openFileRef.current?.click();
           }}
           onSave={() => {
-            if (isDesktop) void saveDesktop();
+            if (isDesktop) void saveDesktop(true);
             else setSaveDlg(docTitle || 'document');
           }}
           onUndo={undo}
