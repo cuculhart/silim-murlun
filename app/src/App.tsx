@@ -163,7 +163,16 @@ export function App() {
   // 差分検知で dirty へ戻らないよう次の1回をクリーン扱いにする
   const cleanNextRef = useRef(false);
   // デスクトップ: 開いている書庫ファイルのパス（null=未保存先なし）
-  const [docPath, setDocPath] = useState<string | null>(null);
+  // 下書きと併せて永続化する — 再起動で下書き復元されても
+  // 「上書き保存」が元のファイルへ向くようにする
+  const [docPath, setDocPathState] = useState<string | null>(() =>
+    localStorage.getItem('silim-docpath'),
+  );
+  const setDocPath = (p: string | null) => {
+    setDocPathState(p);
+    if (p) localStorage.setItem('silim-docpath', p);
+    else localStorage.removeItem('silim-docpath');
+  };
   // デスクトップ: タイトルバーの * 表示用（dirtyRef のミラー）
   const [dirtyUi, setDirtyUi] = useState(false);
   // 起動引数/exeドロップでファイルを開いた印 — 下書き復元より優先する

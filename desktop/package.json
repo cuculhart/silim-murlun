@@ -2,7 +2,7 @@
   "name": "silim-murlun",
   "productName": "Silim Murlun",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Silim Murlun desktop shell (Electron) — renderer is app/ built by Vite",
   "author": "cuculhart",
   "license": "MIT",

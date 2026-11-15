@@ -6,7 +6,7 @@
 import type { Lang, TFunc } from './i18n';
 
 /** 表示バージョン — リリース時に package.json×3 と揃える同期対象 */
-export const APP_VERSION = 'v1.0.1';
+export const APP_VERSION = 'v1.0.2';
 
 /** 配布元トップ — About からの外部導線（cuculhart.com）。
     英語 UI では英語トップ（index.en.html）へ */

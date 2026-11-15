@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-## [1.0.1] - 2026-11-15
+## [1.0.2] - 2026-11-15
 
 ### English
 
@@ -14,6 +14,9 @@
 - The side-menu save tooltip no longer shows a shortcut
   (Ctrl+S overwrite-saves on desktop, so the old "Ctrl+S"
   hint was wrong there)
+- Save now remembers the current file path across restarts —
+  after a draft is restored, "Save" overwrites the original
+  file instead of asking for a location
 
 ### 日本語
 
@@ -24,6 +27,9 @@
 - 修正: 「存」ボタンのツールチップからショートカット表記を
   削除（デスクトップでは Ctrl+S が上書き保存のため、
   旧表記は誤りだった）
+- 修正: 保存先のファイルパスを再起動後も記憶するように —
+  下書き復元された文書でも「上書き保存」が元のファイルへ
+  保存する（以前は保存ダイアログが出ていた）
 
 ## [1.0.0] - 2026-11-15
 
